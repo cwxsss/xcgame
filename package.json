@@ -1,0 +1,18 @@
+{
+  "name": "avalon-online",
+  "version": "1.0.0",
+  "description": "线下阿瓦隆辅助与线上投票对战系统 (Avalon Board Game Online Moderator)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["avalon", "boardgame", "socket.io", "express"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  }
+}

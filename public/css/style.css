@@ -1,0 +1,153 @@
+/* 阿瓦隆手机端专属沉浸样式 */
+:root {
+  --good-blue: #3b82f6;
+  --evil-red: #ef4444;
+  --gold: #f59e0b;
+  --bg-dark: #0f172a;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #0f172a 70%, #030712 100%);
+  color: #f8fafc;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* 玻璃磨砂拟物感 */
+.glass-panel {
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 防窥模糊滤镜 */
+.peep-blur {
+  filter: blur(16px);
+  transition: filter 0.15s ease-out;
+}
+
+.peep-clear {
+  filter: blur(0px) !important;
+}
+
+/* 3D 骰子容器与旋转 */
+.dice-stage {
+  perspective: 600px;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto;
+}
+
+.dice-cube {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dice-face {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  background: linear-gradient(145deg, #ffffff, #e2e8f0);
+  border: 2px solid #cbd5e1;
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.1), 0 6px 12px rgba(0,0,0,0.3);
+}
+
+.dice-face .pip {
+  width: 16px;
+  height: 16px;
+  background: #1e293b;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.4);
+}
+
+.dice-face.red-pip .pip {
+  background: #dc2626;
+}
+
+/* 骰子各个面空间转换 */
+.face-1 { transform: rotateY(0deg) translateZ(45px); }
+.face-2 { transform: rotateY(90deg) translateZ(45px); }
+.face-3 { transform: rotateY(180deg) translateZ(45px); }
+.face-4 { transform: rotateY(-90deg) translateZ(45px); }
+.face-5 { transform: rotateX(90deg) translateZ(45px); }
+.face-6 { transform: rotateX(-90deg) translateZ(45px); }
+
+/* 骰子点数排版 grid */
+.grid-dots-1 { display: flex; justify-content: center; align-items: center; }
+.grid-dots-2 { display: flex; justify-content: space-between; padding: 16px; width: 100%; }
+.grid-dots-3 { display: flex; justify-content: space-between; padding: 16px; width: 100%; transform: rotate(45deg); }
+.grid-dots-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px; }
+.grid-dots-5 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px; position: relative; }
+.grid-dots-5::after {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 16px; height: 16px; background: #1e293b; border-radius: 50%;
+}
+.grid-dots-6 { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 8px 14px; padding: 14px 16px; }
+
+/* 投掷时的剧烈翻滚动画 */
+@keyframes diceRollingAnim {
+  0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(0.9); }
+  25%  { transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg) translateY(-30px) scale(1.1); }
+  50%  { transform: rotateX(720deg) rotateY(540deg) rotateZ(270deg) translateY(-40px) scale(1.15); }
+  75%  { transform: rotateX(900deg) rotateY(720deg) rotateZ(450deg) translateY(-10px) scale(1.05); }
+  100% { transform: rotateX(1080deg) rotateY(900deg) rotateZ(540deg) scale(1); }
+}
+
+.dice-rolling {
+  animation: diceRollingAnim 0.85s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+/* 手机底部安全区适配 */
+.safe-bottom {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 16px));
+}
+
+/* 呼吸动画 */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 28px rgba(245, 158, 11, 0.85); }
+}
+
+.glow-active {
+  animation: pulseGlow 1.8s infinite;
+}
+
+/* 发言中高亮 */
+.speaker-active-border {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.5) !important;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
