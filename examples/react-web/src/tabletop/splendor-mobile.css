@@ -1,0 +1,1028 @@
+/* The mobile board is a compact, glanceable table. Desktop markup remains untouched. */
+.splendor-mobile {
+  display: none;
+}
+
+.splendor-mobile-lobby {
+  display: none;
+}
+
+.splendor-card-portrait {
+  display: block;
+  border-radius: 5px;
+  background: #fff8e6 url('./splendor-card-art.jpg') no-repeat;
+  background-position: calc(var(--art-x, 0) * 33.333%)
+    calc(var(--art-y, 0) * 33.333%);
+  background-size: 400% 400%;
+}
+
+.splendor-desktop-portrait {
+  width: 64px;
+  height: 64px;
+  margin: 4px auto;
+}
+
+.splendor-desktop .splendor-noble-card {
+  border-color: #b38a3b;
+  background: #fff1cc;
+  color: #533a16;
+}
+
+/* The desktop layout used to be a direct child of the shell; keep its spacing
+   after the mobile/desktop switch wrapper was introduced. */
+.splendor-desktop > .splendor-layout {
+  margin-top: 18px;
+}
+
+@media (max-width: 620px) {
+  .splendor-desktop {
+    display: none;
+  }
+
+  .splendor-mobile,
+  .splendor-mobile-lobby {
+    display: grid;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 4px;
+    box-sizing: border-box;
+    color: #203044;
+    font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+
+  .splendor-mobile {
+    grid-template-rows: 24px 38px minmax(164px, auto) repeat(4, auto);
+    padding: 2px 0 0;
+    background:
+      radial-gradient(circle at 90% 4%, #ffe8a8 0 7%, transparent 7.5%),
+      linear-gradient(145deg, #fff3c9 0%, #fffaf1 26%, #fff 82%);
+    border-radius: 10px;
+  }
+
+  .splendor-mobile button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .splendor-mobile-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-status > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 999px;
+    background: #eef3f8;
+    padding: 3px 7px;
+  }
+
+  .splendor-mobile-status > .is-live {
+    background: #e3f6ed;
+    color: #0d7044;
+  }
+
+  .splendor-mobile-status > .is-warn {
+    background: #fff0d2;
+    color: #855800;
+  }
+
+  .splendor-mobile-turn-clock {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .splendor-mobile-clock {
+    display: inline-block;
+    min-width: 34px;
+    color: #25415d;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .splendor-mobile-clock.is-danger {
+    color: #af3c36;
+  }
+
+  .splendor-mobile-players {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-players button {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    column-gap: 3px;
+    min-width: 0;
+    align-content: center;
+    overflow: hidden;
+    border: 1px solid #e1c982;
+    border-radius: 7px;
+    background: #fffdf6;
+    color: #4d6178;
+    padding: 2px 4px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-players button.is-current {
+    border-color: #df8d22;
+    box-shadow: 0 0 0 2px #ffe0a5 inset;
+  }
+
+  .splendor-mobile-players button.is-you {
+    background: #fff3d1;
+  }
+
+  .splendor-mobile-player-icon {
+    display: grid;
+    grid-row: span 2;
+    align-self: center;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #f8c74d, #dd7d1a);
+    color: #fff9e2;
+    font-size: 8px;
+    box-shadow: 0 1px 2px #a85f1b55;
+  }
+
+  .splendor-mobile-players strong,
+  .splendor-mobile-players span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-players strong {
+    color: #1f3651;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-players span {
+    font-size: 9px;
+  }
+
+  .splendor-mobile-players em {
+    position: absolute;
+    right: 2px;
+    bottom: 1px;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 9px;
+    font-style: normal;
+    line-height: 1;
+  }
+
+  .splendor-mobile-market {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .splendor-mobile-market-row {
+    display: grid;
+    grid-template-columns: 30px repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-tier-label {
+    display: grid;
+    grid-template-rows: 17px 12px 1fr;
+    align-items: center;
+    justify-items: center;
+    min-width: 0;
+    border-radius: 7px;
+    background: #f2e3c8;
+    color: #6e4d20;
+    padding: 2px;
+  }
+
+  .splendor-mobile-tier-label.is-level-2 {
+    background: #e2edf8;
+    color: #3f6389;
+  }
+
+  .splendor-mobile-tier-label.is-level-3 {
+    background: #eee8fa;
+    color: #65548b;
+  }
+
+  .splendor-mobile-tier-label strong {
+    font-size: 11px;
+  }
+
+  .splendor-mobile-tier-label small {
+    font-size: 8px;
+  }
+
+  .splendor-mobile-tier-label button {
+    min-width: 0;
+    border: 0;
+    border-radius: 4px;
+    background: #ffffffa8;
+    color: inherit;
+    padding: 1px 2px;
+    font-size: 8px;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-tier-label button:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  .splendor-mobile-market-card {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: 32px auto;
+    align-content: center;
+    border: 1px solid #d7b276;
+    border-radius: 7px;
+    background: #fffdf7;
+    color: #27374c;
+    padding: 3px 4px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-market-card.is-level-2 {
+    border-color: #89a7c8;
+    background: #f8fbff;
+  }
+
+  .splendor-mobile-market-card.is-level-3 {
+    border-color: #9a8bc2;
+    background: #fbf8ff;
+  }
+
+  .splendor-mobile-market-card.is-selected {
+    border-color: #a87518;
+    box-shadow: 0 0 0 2px #f0d29b inset;
+  }
+
+  .splendor-mobile-card-top {
+    grid-area: 1 / 1;
+    z-index: 1;
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 2px;
+    min-width: 0;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-card-top strong {
+    color: #8c5b13;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-card-art,
+  .splendor-mobile-noble-art {
+    min-width: 0;
+    grid-area: 1 / 1;
+    justify-self: center;
+    width: 32px;
+    height: 32px;
+    box-shadow: inset 0 0 0 1px #ffffff66;
+  }
+
+  .splendor-mobile-market-card.is-level-2 .splendor-mobile-card-art {
+    filter: saturate(0.92) hue-rotate(7deg);
+  }
+
+  .splendor-mobile-market-card.is-level-3 .splendor-mobile-card-art {
+    filter: saturate(0.94) hue-rotate(-9deg);
+  }
+
+  .splendor-mobile-bonus,
+  .splendor-mobile-mini-bonus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 800;
+  }
+
+  .splendor-mobile-bonus {
+    width: 14px;
+    height: 14px;
+    color: #fff;
+    font-size: 8px;
+  }
+
+  .splendor-mobile-bonus.is-white,
+  .splendor-mobile-mini-bonus.is-white {
+    background: #b8c3ce;
+    color: #243142;
+  }
+
+  .splendor-mobile-bonus.is-blue,
+  .splendor-mobile-mini-bonus.is-blue {
+    background: #3e75ba;
+    color: #fff;
+  }
+
+  .splendor-mobile-bonus.is-green,
+  .splendor-mobile-mini-bonus.is-green {
+    background: #4d9860;
+    color: #fff;
+  }
+
+  .splendor-mobile-bonus.is-red,
+  .splendor-mobile-mini-bonus.is-red {
+    background: #be514c;
+    color: #fff;
+  }
+
+  .splendor-mobile-bonus.is-black,
+  .splendor-mobile-mini-bonus.is-black {
+    background: #303743;
+    color: #fff;
+  }
+
+  .splendor-mobile-cost {
+    display: flex;
+    align-items: center;
+    align-content: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-cost-token {
+    border-radius: 3px;
+    background: #eef1f4;
+    padding: 1px 2px;
+    color: #516173;
+    font-size: 8px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-cost-token.is-blue {
+    background: #e2eefc;
+    color: #315c91;
+  }
+  .splendor-mobile-cost-token.is-green {
+    background: #e5f3e8;
+    color: #347246;
+  }
+  .splendor-mobile-cost-token.is-red {
+    background: #fbe8e7;
+    color: #96413d;
+  }
+  .splendor-mobile-cost-token.is-black {
+    background: #e7e9ed;
+    color: #303743;
+  }
+
+  .splendor-mobile-section-label {
+    color: #627287;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 12px;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-nobles {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 4px;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .splendor-mobile-noble-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-noble {
+    display: grid;
+    min-width: 0;
+    align-content: center;
+    border: 1px solid #b38a3b;
+    border-radius: 5px;
+    background: #fff1cc;
+    color: #533a16;
+    grid-template-rows: 20px auto;
+    padding: 2px;
+    text-align: left;
+  }
+
+  .splendor-mobile-noble-art {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+
+  .splendor-mobile-noble:disabled {
+    cursor: default;
+  }
+
+  .splendor-mobile-noble.is-eligible {
+    border-color: #956717;
+    background: #ffe1a0;
+    box-shadow: inset 0 0 0 1px #956717;
+    color: #533a16;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-noble > strong {
+    grid-area: 1 / 1;
+    z-index: 1;
+    font-size: 9px;
+  }
+
+  .splendor-mobile-noble .splendor-mobile-cost-token {
+    font-size: 7px;
+  }
+
+  .splendor-mobile-noble-action {
+    color: #6e4606;
+    font-size: 7px;
+    font-weight: 800;
+  }
+
+  .splendor-mobile-self {
+    display: grid;
+    grid-template-rows: 12px 22px minmax(16px, auto);
+    min-width: 0;
+    border: 1px solid #e5dbc7;
+    border-radius: 7px;
+    background: #fffdf6;
+    padding: 3px 5px;
+  }
+
+  .splendor-mobile-self-heading,
+  .splendor-mobile-dialog-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    font-size: 9px;
+  }
+
+  .splendor-mobile-self-heading span {
+    color: #7d6c4b;
+    font-size: 8px;
+  }
+
+  .splendor-mobile-gems {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-gem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    height: 20px;
+    border: 1px solid #dfe6ef;
+    border-radius: 5px;
+    background: #fffdf8;
+    color: #5b6879;
+    padding: 1px 3px;
+    font-size: 8px;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-gem strong {
+    color: #1f3651;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-gem::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    transform: rotate(45deg) skew(-7deg, -7deg);
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.7;
+  }
+
+  .splendor-mobile-gem.is-white::before {
+    background: #e9eef2;
+    border: 1px solid #a7b4c0;
+  }
+  .splendor-mobile-gem.is-blue::before {
+    background: #4c8bd5;
+  }
+  .splendor-mobile-gem.is-green::before {
+    background: #58a96a;
+  }
+  .splendor-mobile-gem.is-red::before {
+    background: #d75c57;
+  }
+  .splendor-mobile-gem.is-black::before {
+    background: #3e4652;
+  }
+  .splendor-mobile-gem.is-gold::before {
+    background: #e8b638;
+  }
+
+  .splendor-mobile-gem.is-white {
+    border-color: #bbc6d0;
+  }
+  .splendor-mobile-gem.is-blue {
+    border-color: #9ab9dd;
+  }
+  .splendor-mobile-gem.is-green {
+    border-color: #a2caaa;
+  }
+  .splendor-mobile-gem.is-red {
+    border-color: #dfa09c;
+  }
+  .splendor-mobile-gem.is-black {
+    border-color: #7b8490;
+  }
+  .splendor-mobile-gem.is-gold {
+    border-color: #d7b05d;
+  }
+
+  .splendor-mobile-gem.is-selected {
+    border-color: #a87518;
+    background: #fff3d2;
+    box-shadow: 0 0 0 1px #edc86b inset;
+  }
+
+  .splendor-mobile-gem:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .splendor-mobile-bonus-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .splendor-mobile-bonus-title {
+    flex: 0 0 auto;
+    color: #7d6c4b;
+    font-size: 8px;
+  }
+
+  .splendor-mobile-mini-bonus {
+    flex: 0 0 auto;
+    min-width: 19px;
+    height: 13px;
+    padding: 0 2px;
+    font-size: 8px;
+  }
+
+  .splendor-mobile-reserved-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 3px;
+  }
+
+  .splendor-mobile-reserved {
+    min-width: 0;
+    min-height: 24px;
+    border: 1px solid #d0b57b;
+    border-radius: 4px;
+    background: #fff6df;
+    color: #795618;
+    padding: 0 3px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-reserved.is-selected {
+    box-shadow: 0 0 0 1px #b67b1e inset;
+  }
+
+  .splendor-mobile-action-panel,
+  .splendor-mobile-supply {
+    min-width: 0;
+    border-radius: 7px;
+    background: #f7f9fc;
+    padding: 3px 5px;
+  }
+
+  .splendor-mobile-action-panel {
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    min-height: 48px;
+    border: 1px solid #dfe6ef;
+  }
+
+  .splendor-mobile-action-panel.is-pending {
+    background: #fff8e8;
+    border-color: #e8ce94;
+  }
+
+  .splendor-mobile-selection,
+  .splendor-mobile-action-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex-wrap: wrap;
+    color: #5f6e80;
+    font-size: 9px;
+  }
+
+  .splendor-mobile-selection > strong,
+  .splendor-mobile-action-heading {
+    color: #2b435d;
+  }
+
+  .splendor-mobile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-actions button {
+    flex: 0 1 auto;
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    background: #204d83;
+    color: #fff;
+    padding: 4px 7px;
+    font-size: 9px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .splendor-mobile-actions button.is-secondary {
+    background: #e9eef4;
+    color: #29435e;
+  }
+
+  .splendor-mobile-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  .splendor-mobile-card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .splendor-mobile-card-actions button {
+    min-height: 32px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 750;
+  }
+
+  .splendor-mobile-card-actions .splendor-mobile-buy {
+    background: #17634e;
+  }
+
+  .splendor-mobile-card-actions .splendor-mobile-reserve {
+    border-color: #9b6014;
+    background: #ffebbd;
+    color: #663c07;
+  }
+
+  .splendor-mobile-card-actions button:disabled {
+    opacity: 1;
+    border-color: #bfc9c8;
+    background: #edf1f1;
+    color: #526460;
+  }
+
+  .splendor-mobile-supply {
+    display: grid;
+    grid-template-rows: 12px 22px;
+    gap: 2px;
+    border: 1px solid #dfe6ef;
+  }
+
+  .splendor-mobile-overlay {
+    position: fixed;
+    z-index: 80;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #17233566;
+    padding: 16px;
+  }
+
+  .splendor-mobile-dialog {
+    width: min(340px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    border: 1px solid #dfe6ef;
+    border-radius: 12px;
+    background: #fffdf8;
+    box-shadow: 0 16px 40px #17233533;
+    padding: 12px;
+  }
+
+  .splendor-mobile-dialog-heading strong {
+    font-size: 14px;
+  }
+
+  .splendor-mobile-dialog-heading button {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: #eef3f8;
+    color: #3b4c60;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .splendor-mobile-dialog-score {
+    margin: 8px 0;
+    color: #5d6c7e;
+    font-size: 11px;
+  }
+
+  .splendor-mobile-dialog-row,
+  .splendor-mobile-bonus-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .splendor-mobile-dialog-row {
+    display: grid;
+    gap: 5px;
+    margin-bottom: 8px;
+    color: #687688;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-lobby {
+    gap: 8px;
+    min-height: min(480px, calc(100dvh - 88px));
+    align-content: start;
+    padding-top: 2px;
+    background:
+      radial-gradient(circle at 10% 20%, #ffe8a3 0 8%, transparent 8.5%),
+      linear-gradient(145deg, #fff0b7, #fffdf7 65%);
+    border-radius: 12px;
+  }
+
+  .splendor-mobile-lobby-card {
+    display: grid;
+    gap: 10px;
+    border: 1px solid #edc66b;
+    border-radius: 12px;
+    background: #fffdf8e8;
+    padding: 12px;
+  }
+
+  .splendor-mobile-lobby-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: #974c13;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-lobby-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: #f6b72b;
+    color: #fff8d6;
+    box-shadow: 0 2px 3px #bd751633;
+  }
+
+  .splendor-mobile-lobby-heading span,
+  .splendor-mobile-lobby-players {
+    color: #657589;
+    font-size: 11px;
+  }
+
+  .splendor-mobile-lobby-players {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .splendor-mobile-lobby-players > span {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 30px;
+    overflow: hidden;
+    border: 1px solid #e6d8b3;
+    border-radius: 7px;
+    background: #fff;
+    padding: 3px 5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-lobby-players > span.is-occupied {
+    color: #80501f;
+  }
+  .splendor-mobile-lobby-players > span.is-empty {
+    color: #9a9c9d;
+    background: #fafafa;
+  }
+
+  .splendor-mobile-lobby-players b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .splendor-mobile-seat-icon {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: #ffe8a9;
+    color: #bd7715;
+    font-style: normal;
+    font-size: 12px;
+  }
+
+  .splendor-mobile-lobby .splendor-mobile-actions button {
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+
+  .splendor-mobile-lobby .splendor-mobile-actions button:first-child {
+    background: #ef8d20;
+    box-shadow: 0 2px 0 #bd6217;
+  }
+
+  .splendor-mobile-lobby .tabletop-card.avalon-timer {
+    margin: 0;
+    padding: 10px;
+  }
+
+  .splendor-mobile-lobby .avalon-timer h2 {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-lobby .avalon-timer form {
+    display: flex;
+    align-items: end;
+    gap: 6px;
+  }
+
+  .splendor-mobile-lobby .avalon-timer label {
+    margin: 0;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-lobby .avalon-timer input {
+    width: 4rem;
+    padding: 4px;
+  }
+
+  .splendor-mobile-lobby .avalon-timer .tabletop-actions button {
+    width: auto;
+    padding: 5px 7px;
+    font-size: 10px;
+  }
+
+  @media (min-width: 351px) and (min-height: 690px) {
+    .splendor-mobile {
+      grid-template-rows:
+        28px 46px minmax(222px, auto) minmax(54px, auto)
+        repeat(3, auto);
+    }
+
+    .splendor-mobile-players strong,
+    .splendor-mobile-card-top {
+      font-size: 12px;
+    }
+
+    .splendor-mobile-cost-token {
+      font-size: 10px;
+    }
+
+    .splendor-mobile-actions button {
+      min-height: 30px;
+    }
+  }
+
+  @media (max-width: 350px) {
+    .splendor-mobile {
+      grid-template-rows: 23px 36px minmax(158px, auto) repeat(4, auto);
+    }
+
+    .splendor-mobile
+      .splendor-mobile-actions:not(.splendor-mobile-card-actions)
+      button {
+      padding-inline: 5px;
+      font-size: 8px;
+    }
+
+    .splendor-mobile-market-row {
+      grid-template-columns: 27px repeat(4, minmax(0, 1fr));
+    }
+
+    .splendor-mobile-tier-label button {
+      font-size: 7px;
+    }
+
+    .splendor-mobile-cost-token {
+      font-size: 7px;
+    }
+  }
+
+  @media (max-height: 650px) {
+    .splendor-mobile {
+      gap: 3px;
+    }
+
+    .splendor-mobile-market-card {
+      grid-template-rows: 25px auto;
+      padding-block: 2px;
+    }
+
+    .splendor-mobile-card-art {
+      width: 25px;
+      height: 25px;
+    }
+
+    .splendor-mobile-self {
+      grid-template-rows: 12px 20px minmax(14px, auto);
+      padding-block: 2px;
+    }
+  }
+}
+
+@media (min-width: 621px) {
+  .splendor-mobile,
+  .splendor-mobile-lobby {
+    display: none;
+  }
+}
+
+.splendor-board .splendor-card.is-affordable,
+.splendor-board .splendor-mobile-market-card.is-affordable {
+  position: relative;
+  border-color: #d96262;
+}
+
+.splendor-board .is-affordable::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 2px dotted #e60023;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: splendor-affordable-pulse 3.6s ease-in-out infinite;
+}
+
+.splendor-board .splendor-mobile-market-card.is-affordable.is-selected {
+  box-shadow: inset 0 0 0 2px #e5ba53;
+}
+
+@keyframes splendor-affordable-pulse {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splendor-board .is-affordable::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,137 @@
+// From the verified transcription of photographed base-game development cards.
+// https://github.com/anicolao/splendor/blob/main/data/verified_card_properties.csv
+// Row: ID, tier, bonus, prestige, then costs in white/blue/green/red/black order.
+const cardRows = [
+  ['white-L1-01', 1, 'white', 0, 0, 3, 0, 0, 0],
+  ['white-L1-02', 1, 'white', 1, 0, 0, 4, 0, 0],
+  ['white-L1-03', 1, 'white', 0, 0, 0, 0, 2, 1],
+  ['white-L1-04', 1, 'white', 0, 0, 2, 0, 0, 2],
+  ['white-L1-05', 1, 'white', 0, 3, 1, 0, 0, 1],
+  ['white-L1-06', 1, 'white', 0, 0, 2, 2, 0, 1],
+  ['white-L1-07', 1, 'white', 0, 0, 1, 1, 1, 1],
+  ['white-L1-08', 1, 'white', 0, 0, 1, 2, 1, 1],
+  ['white-L2-01', 2, 'white', 2, 0, 0, 0, 5, 0],
+  ['white-L2-02', 2, 'white', 3, 6, 0, 0, 0, 0],
+  ['white-L2-03', 2, 'white', 2, 0, 0, 0, 5, 3],
+  ['white-L2-04', 2, 'white', 2, 0, 0, 1, 4, 2],
+  ['white-L2-05', 2, 'white', 1, 0, 0, 3, 2, 2],
+  ['white-L2-06', 2, 'white', 1, 2, 3, 0, 3, 0],
+  ['white-L3-01', 3, 'white', 4, 0, 0, 0, 0, 7],
+  ['white-L3-02', 3, 'white', 4, 3, 0, 0, 3, 6],
+  ['white-L3-03', 3, 'white', 3, 0, 3, 3, 5, 3],
+  ['white-L3-04', 3, 'white', 5, 3, 0, 0, 0, 7],
+  ['blue-L1-01', 1, 'blue', 0, 0, 0, 0, 0, 3],
+  ['blue-L1-02', 1, 'blue', 1, 0, 0, 0, 4, 0],
+  ['blue-L1-03', 1, 'blue', 0, 1, 0, 0, 0, 2],
+  ['blue-L1-04', 1, 'blue', 0, 0, 0, 2, 0, 2],
+  ['blue-L1-05', 1, 'blue', 0, 0, 1, 3, 1, 0],
+  ['blue-L1-06', 1, 'blue', 0, 1, 0, 2, 2, 0],
+  ['blue-L1-07', 1, 'blue', 0, 1, 0, 1, 1, 1],
+  ['blue-L1-08', 1, 'blue', 0, 1, 0, 1, 2, 1],
+  ['blue-L2-01', 2, 'blue', 2, 0, 5, 0, 0, 0],
+  ['blue-L2-02', 2, 'blue', 3, 0, 6, 0, 0, 0],
+  ['blue-L2-03', 2, 'blue', 2, 5, 3, 0, 0, 0],
+  ['blue-L2-04', 2, 'blue', 2, 2, 0, 0, 1, 4],
+  ['blue-L2-05', 2, 'blue', 1, 0, 2, 2, 3, 0],
+  ['blue-L2-06', 2, 'blue', 1, 0, 2, 3, 0, 3],
+  ['blue-L3-01', 3, 'blue', 4, 7, 0, 0, 0, 0],
+  ['blue-L3-02', 3, 'blue', 4, 6, 3, 0, 0, 3],
+  ['blue-L3-03', 3, 'blue', 3, 3, 0, 3, 3, 5],
+  ['blue-L3-04', 3, 'blue', 5, 7, 3, 0, 0, 0],
+  ['green-L1-01', 1, 'green', 0, 0, 0, 0, 3, 0],
+  ['green-L1-02', 1, 'green', 1, 0, 0, 0, 0, 4],
+  ['green-L1-03', 1, 'green', 0, 2, 1, 0, 0, 0],
+  ['green-L1-04', 1, 'green', 0, 0, 2, 0, 2, 0],
+  ['green-L1-05', 1, 'green', 0, 1, 3, 1, 0, 0],
+  ['green-L1-06', 1, 'green', 0, 0, 1, 0, 2, 2],
+  ['green-L1-07', 1, 'green', 0, 1, 1, 0, 1, 1],
+  ['green-L1-08', 1, 'green', 0, 1, 1, 0, 1, 2],
+  ['green-L2-01', 2, 'green', 2, 0, 0, 5, 0, 0],
+  ['green-L2-02', 2, 'green', 3, 0, 0, 6, 0, 0],
+  ['green-L2-03', 2, 'green', 2, 0, 5, 3, 0, 0],
+  ['green-L2-04', 2, 'green', 2, 4, 2, 0, 0, 1],
+  ['green-L2-05', 2, 'green', 1, 2, 3, 0, 0, 2],
+  ['green-L2-06', 2, 'green', 1, 3, 0, 2, 3, 0],
+  ['green-L3-01', 3, 'green', 4, 0, 7, 0, 0, 0],
+  ['green-L3-02', 3, 'green', 4, 3, 6, 3, 0, 0],
+  ['green-L3-03', 3, 'green', 3, 5, 3, 0, 3, 3],
+  ['green-L3-04', 3, 'green', 5, 0, 7, 3, 0, 0],
+  ['red-L1-01', 1, 'red', 0, 3, 0, 0, 0, 0],
+  ['red-L1-02', 1, 'red', 1, 4, 0, 0, 0, 0],
+  ['red-L1-03', 1, 'red', 0, 0, 2, 1, 0, 0],
+  ['red-L1-04', 1, 'red', 0, 2, 0, 0, 2, 0],
+  ['red-L1-05', 1, 'red', 0, 1, 0, 0, 1, 3],
+  ['red-L1-06', 1, 'red', 0, 2, 0, 1, 0, 2],
+  ['red-L1-07', 1, 'red', 0, 1, 1, 1, 0, 1],
+  ['red-L1-08', 1, 'red', 0, 2, 1, 1, 0, 1],
+  ['red-L2-01', 2, 'red', 2, 0, 0, 0, 0, 5],
+  ['red-L2-02', 2, 'red', 3, 0, 0, 0, 6, 0],
+  ['red-L2-03', 2, 'red', 2, 3, 0, 0, 0, 5],
+  ['red-L2-04', 2, 'red', 2, 1, 4, 2, 0, 0],
+  ['red-L2-05', 2, 'red', 1, 2, 0, 0, 2, 3],
+  ['red-L2-06', 2, 'red', 1, 0, 3, 0, 2, 3],
+  ['red-L3-01', 3, 'red', 4, 0, 0, 7, 0, 0],
+  ['red-L3-02', 3, 'red', 4, 0, 3, 6, 3, 0],
+  ['red-L3-03', 3, 'red', 3, 3, 5, 3, 0, 3],
+  ['red-L3-04', 3, 'red', 5, 0, 0, 7, 3, 0],
+  ['black-L1-01', 1, 'black', 0, 0, 0, 3, 0, 0],
+  ['black-L1-02', 1, 'black', 1, 0, 4, 0, 0, 0],
+  ['black-L1-03', 1, 'black', 0, 0, 0, 2, 1, 0],
+  ['black-L1-04', 1, 'black', 0, 2, 0, 2, 0, 0],
+  ['black-L1-05', 1, 'black', 0, 0, 0, 1, 3, 1],
+  ['black-L1-06', 1, 'black', 0, 2, 2, 0, 1, 0],
+  ['black-L1-07', 1, 'black', 0, 1, 1, 1, 1, 0],
+  ['black-L1-08', 1, 'black', 0, 1, 2, 1, 1, 0],
+  ['black-L2-01', 2, 'black', 2, 5, 0, 0, 0, 0],
+  ['black-L2-02', 2, 'black', 3, 0, 0, 0, 0, 6],
+  ['black-L2-03', 2, 'black', 2, 0, 0, 5, 3, 0],
+  ['black-L2-04', 2, 'black', 2, 0, 1, 4, 2, 0],
+  ['black-L2-05', 2, 'black', 1, 3, 2, 2, 0, 0],
+  ['black-L2-06', 2, 'black', 1, 3, 0, 3, 0, 2],
+  ['black-L3-01', 3, 'black', 4, 0, 0, 0, 7, 0],
+  ['black-L3-02', 3, 'black', 4, 0, 0, 3, 6, 3],
+  ['black-L3-03', 3, 'black', 3, 3, 3, 5, 3, 0],
+  ['black-L3-04', 3, 'black', 5, 0, 0, 0, 7, 3],
+];
+
+export const COLORS = ['white', 'blue', 'green', 'red', 'black'];
+export const RESOURCES = [...COLORS, 'gold'];
+
+function requirements(cost) {
+  return Object.fromEntries(
+    COLORS.flatMap((color, index) =>
+      cost[index] ? [[color, cost[index]]] : [],
+    ),
+  );
+}
+
+export const DECKS = [1, 2, 3].map((tier) =>
+  cardRows
+    .filter((row) => row[1] === tier)
+    .map(([id, , color, points, ...cost]) => ({
+      id,
+      tier,
+      color,
+      points,
+      requirements: requirements(cost),
+    })),
+);
+
+// Base-game noble requirements. Each tile is worth three prestige points.
+// https://github.com/boardgamers/splendor/blob/main/packages/engine/src/data.ts
+export const NOBLES = [
+  [0, 0, 4, 4, 0],
+  [0, 4, 4, 0, 0],
+  [4, 4, 0, 0, 0],
+  [4, 0, 0, 0, 4],
+  [0, 0, 0, 4, 4],
+  [0, 3, 3, 3, 0],
+  [3, 0, 3, 3, 0],
+  [3, 3, 0, 0, 3],
+  [0, 0, 3, 3, 3],
+  [3, 3, 3, 0, 0],
+].map((cost, index) => ({
+  id: 'noble-' + (index + 1),
+  points: 3,
+  requirements: requirements(cost),
+}));

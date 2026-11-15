@@ -1,0 +1,640 @@
+/*
+ * Avalon uses a separate compact surface on phones.  The desktop board stays
+ * mounted for large screens so that the full history and rule explanations
+ * remain available without maintaining two game implementations.
+ */
+.avalon-role-portrait {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 2px solid #d9b45e;
+  border-radius: 50%;
+  background-color: #263b57;
+  background-image: url('./avalon-role-portraits.jpg');
+  background-position: var(--portrait-position-x, 0%)
+    var(--portrait-position-y, 0%);
+  background-repeat: no-repeat;
+  background-size: 400% 300%;
+  box-shadow: 0 2px 6px rgba(28, 48, 79, 0.24);
+}
+
+.avalon-role-portrait-large {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 12px;
+}
+
+.avalon-role-portrait-seat {
+  margin: 0 0.35rem 0.5rem 0;
+  vertical-align: middle;
+}
+
+.avalon-secret-copy.has-portrait {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+}
+
+.avalon-secret-copy.has-portrait .avalon-role-portrait {
+  grid-row: 1 / span 2;
+}
+
+.avalon-fate-notice:not(:empty),
+.avalon-assassination-result {
+  margin-block: 4px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #fff0cd;
+  color: #613b07;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.avalon-mobile-board {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .avalon-mobile {
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 0 6px 10px;
+    background: #f5f8fd;
+    font-size: 0.75rem;
+  }
+
+  .avalon-mobile .avalon-desktop {
+    display: none;
+  }
+
+  .avalon-mobile-board {
+    display: grid;
+    gap: 5px;
+  }
+
+  .avalon-mobile-status,
+  .avalon-mobile-section-heading,
+  .avalon-mobile-action-buttons,
+  .avalon-mobile-private-copy,
+  .avalon-mobile-history ol,
+  .avalon-mobile-ballots section {
+    min-width: 0;
+  }
+
+  .avalon-mobile-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 5px;
+    min-height: 27px;
+    color: #43546c;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-status > span:first-child,
+  .avalon-mobile-status > strong,
+  .avalon-mobile-status > span:nth-child(3) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .avalon-mobile-status > span:first-child {
+    border-radius: 999px;
+    background: #e8edf4;
+    padding: 3px 6px;
+    font-size: 0.65rem;
+  }
+
+  .avalon-mobile-status .is-live {
+    background: #e0f4e9;
+    color: #0b7445;
+  }
+
+  .avalon-mobile-status .is-warn {
+    background: #fff0d5;
+    color: #8a5b08;
+  }
+
+  .avalon-mobile-status > strong {
+    color: #172b49;
+    font-size: 0.82rem;
+  }
+
+  .avalon-mobile-clock {
+    border-radius: 7px;
+    background: #e7edf8;
+    color: #1e4e86;
+    padding: 3px 5px;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.74rem;
+    font-weight: 800;
+  }
+
+  .avalon-mobile-clock.is-danger {
+    background: #ffe3e0;
+    color: #a32720;
+  }
+
+  .avalon-mobile-mode {
+    overflow: hidden;
+    color: #63748b;
+    font-size: 0.64rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-quest-track {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #fff;
+    padding: 4px;
+  }
+
+  .avalon-mobile-quest-step {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    border-radius: 5px;
+    background: #f0f3f7;
+    color: #7d8998;
+    padding: 3px 4px;
+  }
+
+  .avalon-mobile-quest-step strong {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #d9e0e9;
+    color: #526276;
+    font-size: 0.62rem;
+  }
+
+  .avalon-mobile-quest-step span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.58rem;
+  }
+
+  .avalon-mobile-quest-step.is-current {
+    background: #eaf2ff;
+    color: #255d9c;
+  }
+
+  .avalon-mobile-quest-step.is-current strong {
+    background: #3979bb;
+    color: #fff;
+  }
+
+  .avalon-mobile-quest-step.is-success {
+    background: #e8f6ed;
+    color: #167342;
+  }
+
+  .avalon-mobile-quest-step.is-success strong {
+    background: #32a365;
+    color: #fff;
+  }
+
+  .avalon-mobile-quest-step.is-failed {
+    background: #fff0ef;
+    color: #a63a34;
+  }
+
+  .avalon-mobile-quest-step.is-failed strong {
+    background: #ca5b52;
+    color: #fff;
+  }
+
+  .avalon-mobile-seats,
+  .avalon-mobile-action {
+    min-width: 0;
+    border: 1px solid #dce5f0;
+    border-radius: 9px;
+    background: #fff;
+    padding: 6px;
+  }
+
+  .avalon-mobile-section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 5px;
+    color: #1b3151;
+  }
+
+  .avalon-mobile-section-heading strong {
+    font-size: 0.8rem;
+  }
+
+  .avalon-mobile-section-heading span {
+    overflow: hidden;
+    color: #7c899b;
+    font-size: 0.64rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-seat-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .avalon-mobile-seat {
+    min-width: 0;
+    min-height: 45px;
+    overflow: hidden;
+    border: 1px solid #dae3ee;
+    border-radius: 6px;
+    background: #fbfcfe;
+    padding: 3px;
+  }
+
+  .avalon-mobile-seat.is-leader {
+    border-color: #d0a13d;
+    box-shadow: 0 0 0 1px #f2dfb6 inset;
+  }
+
+  .avalon-mobile-seat.is-you {
+    background: #eef7ff;
+  }
+
+  .avalon-mobile-seat.is-selected {
+    border-color: #387bc2;
+    background: #eaf3ff;
+  }
+
+  .avalon-mobile-seat-name {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 2px;
+    line-height: 1.1;
+  }
+
+  .avalon-mobile-seat-name strong {
+    overflow: hidden;
+    min-width: 0;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-seat-name small {
+    flex: 0 0 auto;
+    color: #2a6cac;
+    font-size: 0.54rem;
+  }
+
+  .avalon-mobile-avatar {
+    position: relative;
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #e2ebf7;
+    color: #365675;
+    font-size: 0.56rem;
+  }
+
+  .avalon-mobile-role-avatar {
+    width: 14px;
+    height: 14px;
+    border-width: 1px;
+    box-shadow: none;
+  }
+
+  .avalon-mobile-timeouts {
+    padding-top: 2px;
+    font-size: 0.55rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-seat-meta {
+    overflow: hidden;
+    min-height: 12px;
+    margin-top: 2px;
+    color: #8491a1;
+    font-size: 0.62rem;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avalon-mobile-seat-action {
+    width: 100%;
+    min-height: 28px;
+    margin-top: 2px;
+    border: 0;
+    border-radius: 3px;
+    background: #2d6fa9;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    padding: 2px 1px;
+  }
+
+  .avalon-mobile-seat-action:disabled,
+  .avalon-mobile-action-buttons button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .avalon-mobile-seat-action.is-danger {
+    background: #af4546;
+  }
+
+  .avalon-mobile-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .avalon-mobile-action-buttons button {
+    min-height: 40px;
+    border: 0;
+    border-radius: 6px;
+    background: #215f9a;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 5px 14px;
+  }
+
+  .avalon-mobile-action-buttons button.is-secondary {
+    background: #edf2f8;
+    color: #2d4a6b;
+  }
+
+  .avalon-mobile-action-buttons select {
+    min-width: 0;
+    max-width: 145px;
+    border: 1px solid #cbd8e7;
+    border-radius: 6px;
+    background: #fff;
+    color: #243b58;
+    font: inherit;
+    font-size: 0.68rem;
+    padding: 4px 5px;
+  }
+
+  .avalon-mobile-wait,
+  .avalon-mobile-private-result {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 27px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #65758a;
+    padding: 4px 7px;
+    font-size: 0.66rem;
+  }
+
+  .avalon-mobile-private-result {
+    gap: 4px;
+    background: #e8f3ff;
+    color: #20598e;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .avalon-mobile-private-result button {
+    min-height: 20px;
+    padding: 2px 5px;
+  }
+
+  .avalon-mobile-message,
+  .avalon-mobile-error {
+    margin: 5px 0 0;
+    color: #66768a;
+    font-size: 0.65rem;
+    overflow-wrap: anywhere;
+  }
+
+  .avalon-mobile-error {
+    color: #a12c2a;
+  }
+
+  .avalon-mobile-private,
+  .avalon-mobile-history {
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #344b67;
+    padding: 5px 7px;
+  }
+
+  .avalon-mobile-private summary,
+  .avalon-mobile-history summary {
+    cursor: pointer;
+    color: #254d78;
+    font-size: 0.78rem;
+    line-height: 22px;
+    font-weight: 700;
+  }
+
+  .avalon-mobile-private-copy {
+    margin-top: 5px;
+    color: #204d83;
+    font-size: 0.68rem;
+  }
+
+  .avalon-mobile-private-identity {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .avalon-mobile-private-identity .avalon-role-portrait-large {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9px;
+  }
+
+  .avalon-mobile-private-copy ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    margin: 4px 0 0;
+    padding-left: 16px;
+  }
+
+  .avalon-mobile-history ol {
+    display: grid;
+    gap: 3px;
+    margin: 5px 0 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .avalon-mobile-history li {
+    min-width: 0;
+    color: #4c5f76;
+    font-size: 0.64rem;
+  }
+
+  .avalon-mobile-ballots {
+    margin-top: 3px;
+  }
+
+  .avalon-mobile-round-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2px 8px;
+    border-top: 1px solid #e5edf5;
+    padding-top: 3px;
+  }
+
+  .avalon-mobile-history .avalon-mobile-ballots summary {
+    font-size: 0.68rem;
+    line-height: 18px;
+  }
+
+  .avalon-mobile-action .avalon-fate-notice:not(:empty),
+  .avalon-mobile-action .avalon-assassination-result {
+    font-size: 0.68rem;
+  }
+
+  .avalon-mobile-ballots section {
+    border-radius: 5px;
+    background: #f6f8fb;
+    padding: 4px 5px;
+  }
+
+  .avalon-mobile-ballots section > span,
+  .avalon-mobile-ballots section > small {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .avalon-mobile-ballots .avalon-history {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin-top: 3px;
+  }
+
+  .avalon-mobile-ballots .avalon-history li {
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The host can still change the per-step clock without occupying the board. */
+  .avalon-mobile .avalon-timer-settings {
+    margin: 0;
+  }
+
+  .avalon-mobile-timer-settings summary {
+    cursor: pointer;
+    color: #476481;
+    font-size: 0.62rem;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 4px 0 0;
+    border: 1px solid #dce5f0;
+    border-radius: 7px;
+    background: #fff;
+    padding: 5px;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer h2,
+  .avalon-mobile-timer-settings .avalon-timer p,
+  .avalon-mobile-timer-settings .avalon-timer strong,
+  .avalon-mobile-timer-settings .avalon-timer span[role='status'] {
+    display: inline;
+    margin: 0 4px 0 0;
+    font-size: 0.62rem;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin: 0;
+    font-size: 0.58rem;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer input {
+    width: 3.4rem;
+    padding: 2px;
+    font: inherit;
+    font-size: 0.62rem;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer .tabletop-actions {
+    display: block;
+  }
+
+  .avalon-mobile-timer-settings .avalon-timer .tabletop-actions button {
+    min-height: 21px;
+    border: 0;
+    border-radius: 4px;
+    background: #215f9a;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.58rem;
+    padding: 2px 4px;
+  }
+
+  @media (max-width: 350px) {
+    .avalon-mobile {
+      padding-inline: 3px;
+    }
+
+    .avalon-mobile-seat-grid {
+      gap: 3px;
+    }
+
+    .avalon-mobile-seat {
+      padding-inline: 2px;
+    }
+
+    .avalon-mobile-quest-step span {
+      font-size: 0.54rem;
+    }
+  }
+}
+
+@media (min-width: 621px) {
+  .avalon-mobile-board {
+    display: none;
+  }
+}

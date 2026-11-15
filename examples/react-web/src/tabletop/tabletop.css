@@ -1,0 +1,572 @@
+.tabletop-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  color: #1b2638;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+.tabletop-shell .tabletop-pregame-actions > button {
+  font-size: 0.875rem;
+}
+
+.tabletop-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.tabletop-hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+}
+.tabletop-hero p {
+  margin: 0;
+  color: #637083;
+}
+.tabletop-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tabletop-shell > .splendor-layout {
+  margin-top: 18px;
+}
+.avalon-player .tabletop-button {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+.splendor-tier + .splendor-tier {
+  margin-top: 20px;
+}
+.splendor-tier-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.splendor-tier-heading h3 {
+  margin: 0;
+}
+.splendor-card .tabletop-actions,
+.splendor-player .tabletop-button {
+  margin-top: 12px;
+}
+.tabletop-pill {
+  border-radius: 999px;
+  background: #eef3f8;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tabletop-pill.is-live {
+  background: #e3f6ed;
+  color: #0d7044;
+}
+.tabletop-pill.is-warn {
+  background: #fff3da;
+  color: #8b5b00;
+}
+
+.tabletop-card {
+  background: #fff;
+  border: 1px solid #dfe6ef;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(34, 56, 80, 0.08);
+  padding: 18px;
+}
+.tabletop-card h2,
+.tabletop-card h3 {
+  margin: 0 0 12px;
+}
+.tabletop-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(250px, 0.6fr);
+  gap: 18px;
+  align-items: start;
+}
+.tabletop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tabletop-actions button,
+.tabletop-button {
+  border: 0;
+  border-radius: 10px;
+  background: #204d83;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 13px;
+}
+.tabletop-actions button:hover,
+.tabletop-button:hover {
+  background: #163962;
+}
+.tabletop-actions button:disabled,
+.tabletop-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.tabletop-button.secondary {
+  background: #eef3f8;
+  color: #243a54;
+}
+.tabletop-button.danger {
+  background: #ad3a42;
+}
+.tabletop-note {
+  border-radius: 10px;
+  background: #f7f9fc;
+  color: #596b7f;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+}
+.tabletop-error {
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #a0212c;
+  padding: 10px 12px;
+}
+
+/* Avalon */
+.avalon-board {
+  background: linear-gradient(135deg, #eff5ff 0%, #fff 55%);
+}
+.avalon-table {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.avalon-player {
+  min-height: 96px;
+  border: 1px solid #d7e1ee;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px;
+  position: relative;
+}
+.avalon-player.is-leader {
+  border-color: #d39f3c;
+  box-shadow: 0 0 0 2px #f4dfae inset;
+}
+.avalon-player.is-you {
+  background: #eff8ff;
+}
+.avalon-player.is-selected {
+  border-color: #2c73c5;
+  box-shadow: 0 0 0 2px #b7d5f5 inset;
+}
+.avalon-player-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.avalon-player-meta {
+  color: #6d7d90;
+  font-size: 0.82rem;
+  margin-top: 7px;
+}
+.avalon-crown {
+  position: absolute;
+  right: 9px;
+  top: 7px;
+}
+.avalon-team {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.avalon-team span {
+  border-radius: 999px;
+  background: #e4effd;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+.avalon-history {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.avalon-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #edf1f5;
+  padding-bottom: 7px;
+}
+.avalon-secret {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #1f385c;
+  color: #fff;
+  border-radius: 12px;
+  padding: 14px;
+}
+.avalon-secret-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.avalon-secret-copy span {
+  color: #d9e9ff;
+  overflow-wrap: anywhere;
+}
+.avalon-secret:not(.is-revealed) {
+  background: #27334a;
+}
+.avalon-vision {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 14px;
+  border: 1px solid #c9ddf4;
+  border-radius: 12px;
+  background: #edf6ff;
+  color: #234e7b;
+  padding: 12px 14px;
+}
+.avalon-vision > span {
+  color: #5d7590;
+  font-size: 0.88rem;
+}
+.avalon-vision ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 2px 0 0;
+  padding-left: 20px;
+}
+.avalon-mode-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: #304766;
+}
+.avalon-mode-strip strong,
+.avalon-mode-strip span {
+  border-radius: 999px;
+  background: #eef3f8;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+}
+.avalon-mode-strip strong {
+  background: #e3f6ed;
+  color: #0d7044;
+}
+.avalon-advanced-action {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid #d8e3f1;
+  border-radius: 12px;
+  background: #f7faff;
+  padding: 12px;
+}
+.avalon-advanced-action > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.avalon-advanced-action span {
+  color: #5d6d80;
+  font-size: 0.9rem;
+}
+.avalon-advanced-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.avalon-advanced-form select {
+  min-width: 150px;
+  border: 1px solid #c7d4e4;
+  border-radius: 8px;
+  background: #fff;
+  color: #1b2638;
+  font: inherit;
+  padding: 9px 10px;
+}
+.avalon-private-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #eaf4ff;
+  color: #204d83;
+  padding: 9px 10px;
+}
+.avalon-advanced-action--danger {
+  border-color: #f0c8cb;
+  background: #fff7f7;
+}
+.avalon-advanced-action--danger span {
+  color: #8f4d54;
+}
+
+/* Splendor */
+.splendor-board {
+  background: linear-gradient(135deg, #fffaf1 0%, #fff 60%);
+}
+.splendor-layout {
+  display: grid;
+  gap: 18px;
+}
+.splendor-level {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+.splendor-card {
+  min-height: 142px;
+  border: 2px solid #d7b276;
+  border-radius: 13px;
+  background: #fffdf7;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.splendor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 16px rgba(123, 76, 23, 0.12);
+}
+.splendor-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+.splendor-card.is-level-2 {
+  border-color: #89a7c8;
+  background: #f8fbff;
+}
+.splendor-card.is-level-3 {
+  border-color: #9a8bc2;
+  background: #fbf8ff;
+}
+.splendor-card-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 14px;
+}
+.gem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.gem-white {
+  background: #b8c3ce;
+  color: #243142;
+}
+.gem-blue {
+  background: #3e75ba;
+}
+.gem-green {
+  background: #4d9860;
+}
+.gem-red {
+  background: #be514c;
+}
+.gem-black {
+  background: #303743;
+}
+.gem-gold {
+  background: #cf9b27;
+}
+.splendor-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.splendor-token {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid #e1e7ee;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+}
+.splendor-token.is-selected {
+  border-color: #b67b1e;
+  box-shadow: 0 0 0 2px #f0d29b inset;
+  background: #fff8e8;
+}
+.splendor-player-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.splendor-player {
+  border: 1px solid #e3e8ef;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+.splendor-points {
+  color: #975c09;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.splendor-owned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.splendor-owned span {
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: #f4ead7;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 780px) {
+  .tabletop-hero {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tabletop-status {
+    justify-content: flex-start;
+  }
+  .tabletop-grid {
+    grid-template-columns: 1fr;
+  }
+  .avalon-table {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .splendor-level {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .tabletop-card {
+    padding: 13px;
+    border-radius: 12px;
+  }
+  .avalon-table {
+    grid-template-columns: 1fr;
+  }
+  .splendor-level {
+    grid-template-columns: 1fr;
+  }
+  .splendor-card {
+    min-height: 120px;
+  }
+  .tabletop-actions button,
+  .tabletop-button {
+    width: 100%;
+  }
+  .avalon-secret {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .avalon-mode-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .avalon-mode-strip strong,
+  .avalon-mode-strip span {
+    width: 100%;
+  }
+  .avalon-advanced-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .avalon-advanced-form select {
+    width: 100%;
+  }
+}
+.avalon-history > .avalon-round {
+  display: block;
+}
+
+.avalon-round summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding-block: 0.4rem;
+}
+
+.avalon-ballot {
+  background: #f7f9fc;
+  border-radius: 0.65rem;
+  margin: 0.5rem 0;
+  padding: 0.65rem;
+}
+
+.avalon-ballot h3 {
+  font-size: 0.95rem;
+}
+
+.avalon-ballot p {
+  overflow-wrap: anywhere;
+}
+.avalon-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.avalon-clock {
+  display: inline-block;
+  margin-inline-end: 0.75rem;
+  font-size: 1.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.avalon-timer label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.avalon-timer input {
+  width: 6rem;
+  padding: 0.4rem;
+}
+.avalon-seat-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0 0.35rem 0.5rem 0;
+  border-radius: 50%;
+  background: #eef3ff;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+.avalon-timeout-badges {
+  margin-top: 0.2rem;
+  font-size: 0.58rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.splendor-timeouts {
+  margin-inline-start: 0.3rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}

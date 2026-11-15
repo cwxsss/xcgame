@@ -1,0 +1,636 @@
+:root {
+  font-family:
+    'DM Sans', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+  color: #172437;
+  background: #f7f5ef;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  color: inherit;
+}
+
+.tt-site {
+  min-height: 100vh;
+}
+.tt-mode-description {
+  color: #534e52;
+  line-height: 1.5;
+}
+.tt-options {
+  border: 1px solid #e1dcd2;
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+}
+.tt-options summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.tt-panel .tt-options label {
+  display: flex;
+  align-items: center;
+  margin: 0.55rem 0;
+}
+.tt-panel .tt-options input {
+  width: 1.2rem;
+  min-height: 1.2rem;
+  margin: 0;
+}
+.tt-site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  min-height: 4.35rem;
+  padding: 0.8rem max(1.25rem, calc((100% - 1100px) / 2));
+  background: #161c2d;
+  color: #f8f6ed;
+}
+.tt-site-header a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tt-brand {
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+.tt-main {
+  width: min(1100px, calc(100% - 2.5rem));
+  margin: auto;
+  padding-bottom: 3rem;
+}
+.tt-intro {
+  margin: clamp(2.5rem, 6vw, 5rem) 0 2rem;
+}
+.tt-intro h1,
+.tt-room-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+.tt-intro p,
+.tt-room-header p {
+  color: #534e52;
+  line-height: 1.65;
+}
+.tt-games,
+.tt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+.tt-actions {
+  margin-top: 1.3rem;
+}
+.tt-game {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  color: #172437;
+  background: #fffdf9;
+  border: 2px solid #e1dcd2;
+  border-radius: 1.1rem;
+}
+.tt-game[aria-pressed='true'] {
+  border-color: #226753;
+}
+.tt-game-art {
+  display: grid;
+  place-content: center;
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(8rem, 19vw, 13rem);
+  font-size: clamp(4rem, 12vw, 7rem);
+}
+.tt-game-art::before,
+.tt-game-art::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 12% 17%;
+  border: 1px solid currentColor;
+  opacity: 0.23;
+}
+.tt-game-art::after {
+  inset: 19% 22%;
+}
+.tt-game--splendor .tt-game-art {
+  background: #143a35 url('./splendor-cover.jpg') 76% 49% / cover no-repeat;
+}
+.tt-game--splendor .tt-game-art > span,
+.tt-game--splendor .tt-game-art::before,
+.tt-game--splendor .tt-game-art::after {
+  display: none;
+}
+.tt-game--avalon .tt-game-art {
+  background: radial-gradient(ellipse at 50% 33%, #625263, #25283f 75%);
+  color: #f2d5a3;
+  text-shadow: 0 0.12em 0.2em #221d36;
+}
+.tt-game-info {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  line-height: 1.55;
+}
+.tt-game-info strong {
+  font-size: 1.8rem;
+  line-height: 1.15;
+}
+.tt-game-meta {
+  font-size: 0.875rem;
+  color: #514d50;
+  font-weight: 650;
+}
+.tt-game-status {
+  margin-top: 0.35rem;
+  color: #226753;
+  font-weight: 750;
+}
+.tt-panel {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+  padding: 1.35rem;
+  border: 1px solid #e1dcd2;
+  border-radius: 1rem;
+  background: #fffdf9;
+}
+.tt-panel h2,
+.tt-panel p {
+  margin: 0;
+}
+.tt-panel h2 {
+  font-size: 1.2rem;
+}
+.tt-panel label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 650;
+}
+.tt-panel input,
+.tt-panel select {
+  width: 100%;
+  min-height: 2.8rem;
+  border: 1px solid #bdb7aa;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #172437;
+  padding: 0.4rem 0.7rem;
+}
+.tt-button {
+  width: fit-content;
+  min-height: 2.65rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #226753;
+  border-radius: 0.55rem;
+  font-weight: 750;
+}
+.tt-primary {
+  background: #226753;
+  color: #fff;
+}
+.tt-secondary {
+  background: #fffdf9;
+  color: #1c5446;
+}
+.tt-button:disabled {
+  opacity: 0.6;
+}
+.tt-site :focus-visible {
+  outline: 3px solid #5183d7;
+  outline-offset: 3px;
+}
+.tt-room-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem 1rem;
+  align-items: end;
+  margin: 1.65rem 0;
+}
+.tt-room-header h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin-top: 0.65rem;
+}
+.tt-room-header p {
+  margin: 0.45rem 0 0;
+}
+.tt-back {
+  color: #226753;
+}
+.tt-invite-popover {
+  display: grid;
+  min-width: 0;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem;
+  border: 1px solid #dedacf;
+  border-radius: 0.6rem;
+  background: #fffdf9;
+}
+.tt-invite-link {
+  color: #1c5446;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+.tt-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tt-invite-popover [role='status'] {
+  font-size: 0.8rem;
+  color: #34564a;
+}
+.splendor-desktop .gem {
+  clip-path: polygon(
+    22% 0,
+    78% 0,
+    100% 22%,
+    100% 78%,
+    78% 100%,
+    22% 100%,
+    0 78%,
+    0 22%
+  );
+  background-image: linear-gradient(
+    142deg,
+    #ffffff48 0 23%,
+    transparent 24% 68%,
+    #00000022 69%
+  );
+}
+.tt-join {
+  max-width: 30rem;
+}
+.tt-notice {
+  padding: 0.85rem 1rem;
+  border-radius: 0.55rem;
+  background: #eae9df;
+  color: #263647;
+}
+.tt-error {
+  background: #fae6e0;
+  color: #802c24;
+}
+
+@media (min-width: 621px) {
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-site-header {
+    display: none;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-main {
+    display: flex;
+    flex-direction: column;
+    width: min(1280px, calc(100% - 24px));
+    min-height: 100dvh;
+    padding-bottom: 10px;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .splendor-board {
+    width: 100%;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header {
+    margin: 0;
+    padding-block: 8px;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header > div {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    min-width: 0;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header p {
+    margin: 0;
+    font-size: 0.8rem;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .voice-panel.is-collapsed {
+    position: static;
+    align-self: flex-end;
+    margin-top: auto;
+    padding-top: 3px;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher {
+    min-height: 38px;
+    padding: 3px 8px;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher-icon {
+    width: 27px;
+    height: 27px;
+  }
+
+  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher-copy > span {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile) {
+    min-height: 100dvh;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-site-header {
+    display: none;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-main {
+    display: flex;
+    flex-direction: column;
+    width: calc(100% - 0.75rem);
+    min-height: 100dvh;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    position: relative;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-room-header {
+    flex-wrap: nowrap;
+    min-height: 2.5rem;
+    margin: 0 0 0.2rem;
+    gap: 0.25rem;
+    align-items: center;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-room-header
+    > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 0.4rem;
+    min-width: 0;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-room-header
+    h1 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-room-header
+    p {
+    display: none;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-back {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-room-header
+    .tt-button {
+    min-height: 2.15rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .tt-invite-popover {
+    position: absolute;
+    z-index: 45;
+    inset: 2.6rem 0 auto;
+    padding: 0.55rem;
+    border: 1px solid #dedacf;
+    border-radius: 0.6rem;
+    background: #fffdf9;
+    box-shadow: 0 0.3rem 1rem #18283322;
+  }
+
+  .tt-main .splendor-mobile-lobby .splendor-mobile-lobby-heading {
+    min-height: 62px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background:
+      linear-gradient(90deg, #06271a 8%, #06271a29 92%),
+      #143a35 url('./splendor-cover.jpg') 72% 49% / cover no-repeat;
+    color: #fff8df;
+  }
+
+  .tt-main .splendor-mobile-lobby-heading span {
+    color: #fff8df;
+  }
+
+  .tt-main .splendor-mobile-lobby-heading > span {
+    padding: 3px 5px;
+    border-radius: 4px;
+    background: #082e22dc;
+    white-space: nowrap;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .voice-panel.is-collapsed {
+    position: static;
+    align-self: flex-end;
+    margin-top: auto;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .voice-launcher {
+    min-height: 34px;
+    gap: 0.15rem;
+    padding: 0.1rem 0.42rem;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .voice-launcher-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.82rem;
+  }
+
+  .tt-site:has(.splendor-mobile, .splendor-mobile-lobby, .avalon-mobile)
+    .voice-launcher-copy
+    > span {
+    display: none;
+  }
+
+  .tt-main {
+    width: min(100% - 1.5rem, 1100px);
+  }
+  .tt-site-header {
+    padding-inline: 0.75rem;
+  }
+  .tt-site:has(.tt-intro) .tt-site-header {
+    min-height: 44px;
+    padding-block: 6px;
+  }
+
+  .tt-site:has(.tt-intro) .tt-brand {
+    font-size: 1rem;
+  }
+
+  .tt-site:has(.tt-intro) .tt-main {
+    padding-bottom: 12px;
+  }
+
+  .tt-intro {
+    margin: 12px 0;
+  }
+
+  .tt-intro h1 {
+    font-size: 1.35rem;
+  }
+
+  .tt-intro p {
+    display: none;
+  }
+
+  .tt-games {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .tt-game {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    border-radius: 9px;
+  }
+
+  .tt-game[aria-pressed='true'] {
+    background: #eaf5ef;
+  }
+
+  .tt-game-art {
+    min-height: 54px;
+    font-size: 1.3rem;
+  }
+
+  .tt-game-art::before,
+  .tt-game-art::after {
+    display: none;
+  }
+
+  .tt-game-info {
+    align-content: center;
+    gap: 3px;
+    padding: 6px;
+    line-height: 1.15;
+  }
+
+  .tt-game-info strong {
+    grid-row: 1;
+    font-size: 0.92rem;
+  }
+
+  .tt-game-meta {
+    font-size: 0.65rem;
+  }
+
+  .tt-game-info > strong + span,
+  .tt-game-status {
+    display: none;
+  }
+
+  .tt-actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .tt-actions .tt-panel {
+    gap: 6px;
+    padding: 9px;
+    border-radius: 10px;
+  }
+
+  .tt-actions .tt-panel h2 {
+    font-size: 0.9rem;
+  }
+
+  .tt-actions .tt-panel > label {
+    grid-template-columns: 4.1rem minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+  }
+
+  .tt-actions .tt-panel > label > input,
+  .tt-actions .tt-panel > label > select {
+    min-height: 40px;
+    padding-inline: 7px;
+    font-size: 1rem;
+  }
+
+  .tt-actions .tt-button {
+    width: 100%;
+    min-height: 40px;
+    padding-block: 4px;
+    font-size: 0.86rem;
+  }
+
+  .tt-actions .tt-mode-description {
+    font-size: 0.73rem;
+    line-height: 1.35;
+  }
+
+  .tt-actions #join-room {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  #join-room h2,
+  #join-room .tt-notice {
+    grid-column: 1 / -1;
+  }
+
+  .tt-actions #join-room > label {
+    display: block;
+    font-size: 0;
+  }
+
+  #join-room input {
+    min-width: 0;
+  }
+
+  #join-room input::placeholder {
+    font-size: 0.75rem;
+  }
+
+  #join-room .tt-button {
+    padding-inline: 6px;
+    font-size: 0.75rem;
+  }
+}

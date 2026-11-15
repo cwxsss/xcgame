@@ -1,93 +1,123 @@
-# 阿瓦隆线上法官与移动端对战系统 (Avalon Board Game Online Moderator)
+# 小褚游戏厅 · xcgame
 
-专为**线下聚会玩《阿瓦隆》（The Resistance: Avalon）**打造的多人实时联机法官与流程控制系统。手机端深度适配优化，全员打开网页即可轻松游玩！
+基于 boardgame.io 的中文在线桌游厅，包含宝石商人和阿瓦隆，支持邀请链接、AI 补位、回合计时及房间语音。
 
----
+## 本地启动
 
-## 🌟 核心特性
+使用 Node.js 24 和 pnpm，在仓库根目录执行：
 
-1. **📱 手机端深度适配与极致体验**
-   - **移动优先设计**：针对 iPhone、Android 移动端屏幕与触控做了全面优化，触控按键大且防误触。
-   - **同一 Wi-Fi 秒连**：启动后自动生成局域网链接与**二维码**，朋友拿出手机扫码即可一键带房间号加入！
-   - **机密底牌防窥模式**：按住按钮清晰显露个人身份与视线，松开手指瞬间磨砂模糊，彻底杜绝线下邻座偷看！
+```powershell
+pnpm install --frozen-lockfile
+pnpm --dir examples/react-web install --frozen-lockfile
+pnpm run build
+pnpm --dir examples/react-web run tabletop:build
+$env:TABLETOP_ACCESS_PASSWORD = '设置一个本地入口密码'
+pnpm run tabletop:serve
+```
 
-2. **🎲 骰子比拼选先手（特色玩法）**
-   - **掷骰子开车**：第一轮开车前，全员在手机上投掷 3D 动画骰子。
-   - **谁点数最大，谁先发车**：系统自动比对点数，点数最高者直接头戴皇冠成为第 1 轮发车队长！若最高点并列，支持平局加投。
+浏览器打开 `http://127.0.0.1:8000`。部署时可配置 `HOST`、`PORT`、`BOARDGAME_ORIGIN` 和 `FLATFILE_DIR`。多人语音需要 HTTPS，持久化门禁会话可配置 `TABLETOP_ACCESS_SECRET`。入口密码和签名密钥应通过运行环境提供。
 
-3. **🗣️ 完整的线下发言控场流程**
-   - **麦序流转**：支持队长首发顺时针发言、逆时针发言与自由发言。
-   - **大字倒计时**：实时倒计时（支持 30s/60s/90s/120s 可调），最后 5 秒伴随滴答提示音。
-   - **过麦与法官管理**：当前发言人可随时点击“过麦”，房主拥有“上一位/下一位/暂停/重置/结束”完整控场能力。
+下文是上游 boardgame.io 的项目说明。本项目保留上游 [MIT 许可证](LICENSE)。
 
-4. **🎭 丰富的角色与玩法预设**
-   - **玩法预设一键切换**：
-     - 👑 经典标准局（梅林、派西维尔、莫甘娜、刺客）
-     - ⚜️ 善恶双兰模式（正义兰斯洛特、邪恶兰斯洛特，第 3/4/5 轮抽取命运之牌可能互换阵营）
-     - 👹 莫德雷德局（莫德雷德在梅林视野中隐身）
-     - 👁️ 孤狼奥伯伦局（奥伯伦属于邪恶但不与队友互看）
-     - 🌟 诸神全拓展大乱斗（双兰 + 莫甘娜 + 莫德雷德 + 湖中仙女）
-     - 🛠️ 自由自定义配置
-   - **夜间视线机制**：
-     - 梅林看所有邪恶（除莫德雷德）；派西维尔看梅林与莫甘娜假象；
-     - 邪恶阵营互通视野；刺客能看邪恶兰斯洛特，邪恶兰斯洛特与正义兰斯洛特互知身份（恶兰不看刺客）；
-     - 智能防剧透机制：玩家昵称严禁包含梅林、刺客等任何身份词汇。
+<p align="center">
+  <a href="https://boardgame.io/">
+    <img src="https://raw.githubusercontent.com/boardgameio/boardgame.io/main/docs/logo-optimized.svg?sanitize=true" alt="boardgame.io" />
+  </a>
+</p>
 
-5. **🗳️ 完善的双重投票系统与战局掌控**
-   - **车长出征与选人**：发车车长按规则强制在出征队伍中（例如 2 人出征车长占 1 位，只需再挑选 1 人）。
-   - **车票提案公开投票**：队长选人后全员手机弹出赞成/反对按钮，实时显示已投人数，全员投完后**同步翻牌公示每个人投了什么**（包含谁投了成功票、谁投了失败票名单）；常驻发车记录栏随时展开/折叠查阅历史票型。
-   - **线下物理座次对调**：支持随时打开座次面板，点击对应座位号与在场玩家瞬间对调，顺时针席位井然有序。
-   - **刺客随时拍刀与绝杀**：默认开启蓝方三胜前刺杀规则，刺客本人可在对决中随时点击“立即拍刀”提前刺杀梅林；游戏结束揭晓全场底牌与五轮明细复盘。
+<p align="center">
+<a href="https://www.npmjs.com/package/boardgame.io"><img src="https://badge.fury.io/js/boardgame.io.svg" alt="npm version" /></a>
+<a href="https://github.com/boardgameio/boardgame.io/actions?query=workflow%3ATests"> <img src="https://github.com/boardgameio/boardgame.io/workflows/Tests/badge.svg" alt='Build Status'></a>
+<a href='https://coveralls.io/github/boardgameio/boardgame.io?branch=main'><img src='https://coveralls.io/repos/github/boardgameio/boardgame.io/badge.svg?branch=main' alt='Coverage Status' /></a>
+<a href="https://gitter.im/boardgame-io"><img src="https://badges.gitter.im/boardgame-io.svg" alt="Gitter" /></a>
+</p>
 
----
+<p align="center">
+  <strong><a href="https://boardgame.io/documentation/#/">Read the Documentation</a></strong>
+</p>
 
-## 🚀 快速启动与游玩
+<p align="center">
+  <strong>boardgame.io</strong> is an engine for creating turn-based games using JavaScript.
+</p>
 
-### 1. 启动服务
-在项目根目录下运行：
-```bash
+Write simple functions that describe how the game state changes
+when a particular move is made. This is automatically converted
+into a playable game complete with online multiplayer
+features, all without requiring you to write a single line of
+networking or storage code.
+
+### Features
+
+- **State Management**: Game state is managed seamlessly across clients, server and storage automatically.
+- **Multiplayer**: Game state is kept in sync in realtime and across platforms.
+- **AI**: Automatically generated bots that can play your game.
+- **Game Phases**: with different game rules and turn orders per phase.
+- **Lobby**: Player matchmaking and game creation.
+- **Prototyping**: Interface to simulate moves even before you render the game.
+- **Extendable**: Plugin system that allows creating new abstractions.
+- **View-layer Agnostic**: Use the vanilla JS client or the bindings for React / React Native.
+- **Logs**: Game logs with the ability to time travel (viewing the board at an earlier state).
+
+## Usage
+
+### Installation
+
+```sh
+npm install boardgame.io
+```
+
+### Documentation
+
+Read our [Full Documentation](https://boardgame.io/documentation/) to learn how to
+use boardgame.io, and join the [community on gitter](https://gitter.im/boardgame-io/General)
+to ask your questions!
+
+### Running examples in this repository
+
+```sh
+npm install
 npm start
 ```
 
-终端控制台将打印类似以下信息：
-```text
-======================================================
-🏰 阿瓦隆线下法官与线上联机系统已就绪！
-💻 本机访问地址:   http://localhost:3000
-📱 手机局域网访问: http://192.168.1.100:3000
-🎲 所有人用同一WiFi下的手机浏览器打开上述地址即可直接加入！
-======================================================
-```
+The examples can be found in the [examples](examples/) folder.
 
-### 2. 线下开局步骤
-1. 确保电脑与在场朋友的手机连接在**同一个 Wi-Fi** 下。
-2. 房主在电脑或手机上打开上述地址，输入昵称创建房间。
-3. 房主点击右上角 **【二维码】** 图标，在场朋友拿出手机扫一扫即可进入房间。
-4. 人数到齐后（5~10人），房主勾选配置角色与规则，点击 **“确认阵容并开始游戏”**。
-5. 大家在手机上长按查看身份与专属视线，投掷骰子决出发车队长，开启对决！
+#### Using VS Code?
 
----
+This repository is ready to run in a dev container in VS Code. See [the contributing guidelines for details](CONTRIBUTING.md).
 
-## 🛠️ 项目结构
+## Changelog
 
-```text
-avalon-online/
-├── server.js                   # Node.js + Express + Socket.IO 服务器
-├── package.json                # 项目依赖与启动脚本
-├── src/
-│   ├── game/
-│   │   ├── constants.js        # 角色字典、规则配置与阶段枚举
-│   │   ├── AvalonGame.js       # 核心游戏状态机与房间逻辑
-│   │   └── VisionCalculator.js # 阿瓦隆夜间专属视线计算器
-│   └── network/
-│       └── ipHelper.js         # 局域网 IP 与二维码工具
-├── public/                     # 客户端 Web 资源
-│   ├── index.html              # 移动端沉浸式单页 HTML
-│   ├── css/
-│   │   └── style.css           # 3D骰子、防窥滤镜与暗黑中世纪主题
-│   └── js/
-│       ├── app.js              # 前端交互与 Socket 驱动
-│       └── audio.js            # Web Audio 零依赖合成音效
-└── test/
-    └── test_game.js            # 核心业务逻辑自动化测试脚本
-```
+See [changelog](docs/documentation/CHANGELOG.md).
+
+## Get involved
+
+We welcome contributions of all kinds!
+Please take a moment to review our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+🐛 **Found a bug?**  
+Let us know by [creating an issue][new-issue].
+
+❓ **Have a question?**  
+Our [Gitter channel][gitter] and [GitHub Discussions][discussions]
+are good places to start.
+
+⚙️ **Interested in fixing a [bug][bugs] or adding a [feature][features]?**  
+Check out the [contributing guidelines](CONTRIBUTING.md)
+and the [project roadmap](roadmap.md).
+
+📖 **Can we improve [our documentation][docs]?**  
+Pull requests even for small changes can be helpful. Each page in the
+docs can be edited by clicking the “Edit on GitHub” link at the top right.
+
+[new-issue]: https://github.com/boardgameio/boardgame.io/issues/new/choose
+[gitter]: https://gitter.im/boardgame-io/General
+[discussions]: https://github.com/boardgameio/boardgame.io/discussions
+[bugs]: https://github.com/boardgameio/boardgame.io/issues?q=is%3Aissue+is%3Aopen+label%3Abug
+[features]: https://github.com/boardgameio/boardgame.io/issues?q=is%3Aissue+is%3Aopen+label%3Afeature
+[docs]: https://boardgame.io/documentation/
+[sponsors]: https://github.com/sponsors/boardgameio
+[collective]: https://opencollective.com/boardgameio#support
+
+## License
+
+[MIT](LICENSE)

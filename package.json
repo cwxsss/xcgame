@@ -1,18 +1,305 @@
 {
-  "name": "avalon-online",
-  "version": "1.0.0",
-  "description": "线下阿瓦隆辅助与线上投票对战系统 (Avalon Board Game Online Moderator)",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+  "name": "boardgame.io",
+  "version": "0.50.2",
+  "packageManager": "pnpm@10.16.0",
+  "description": "library for turn-based games",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boardgameio/boardgame.io.git"
   },
-  "keywords": ["avalon", "boardgame", "socket.io", "express"],
-  "author": "",
+  "scripts": {
+    "prestart": "run-p examples:install build",
+    "start": "run-p dev:server dev:client",
+    "tabletop:serve": "babel-node --extensions .ts,.js --presets @babel/preset-env examples/react-web/tabletop-server.js",
+    "predev": "pnpm run examples:install",
+    "dev": "run-p build:watch dev:server dev:client",
+    "dev:client": "node scripts/dev-client.js",
+    "dev:server": "cross-env NODE_ENV=development nodemon -w src -w examples -e js,ts --exec babel-node --extensions \".ts,.js\" --ignore \"src/**/*.test.ts\" --presets @babel/preset-env examples/react-web/server.js",
+    "build": "cross-env BABEL_ENV=rollup rollup --config rollup.config.js  --silent",
+    "build:watch": "cross-env BABEL_ENV=rollup rollup -w --config rollup.config.js",
+    "benchmark": "babel-node --extensions .ts,.js --presets @babel/preset-env,@babel/preset-typescript benchmark/index.js",
+    "docs": "docsify serve docs",
+    "examples": "pnpm run start",
+    "examples:install": "node scripts/install-examples.js",
+    "pretest": "pnpm run lint",
+    "test": "cross-env NODE_ENV=test jest",
+    "test:watch": "cross-env NODE_ENV=test jest --watch",
+    "test:coverage": "pnpm run lint && cross-env NODE_ENV=test jest --coverage --collectCoverageFrom=\"src/**\"",
+    "test:coveralls": "coveralls < coverage/lcov.info",
+    "test:integration": "node ./scripts/integration.js",
+    "ts": "tsc --noEmit",
+    "ts:watch": "tsc --noEmit --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "prepublishOnly": "pnpm run clean",
+    "proxydirs": "node scripts/proxy-dirs.js",
+    "prepack": "run-s build proxydirs",
+    "postpack": "pnpm run clean",
+    "prettier": "prettier --write \"{examples,src,benchmark}/**/*.{ts,tsx,js,jsx,css,md}\"",
+    "changelog": "node ./scripts/changelog.js",
+    "clean": "node ./scripts/clean.js",
+    "prepare": "husky"
+  },
+  "sideEffects": false,
+  "main": "dist/boardgameio.js",
+  "unpkg": "dist/boardgameio.min.js",
+  "module": "dist/boardgameio.es.js",
+  "types": "dist/types/src/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/types.d.ts",
+      "import": "./dist/esm/main.js",
+      "require": "./dist/cjs/main.js"
+    },
+    "./client": {
+      "types": "./dist/types/packages/client.d.ts",
+      "import": "./dist/esm/client.js",
+      "require": "./dist/cjs/client.js"
+    },
+    "./core": {
+      "types": "./dist/types/packages/core.d.ts",
+      "import": "./dist/esm/core.js",
+      "require": "./dist/cjs/core.js"
+    },
+    "./debug": {
+      "types": "./dist/types/packages/debug.d.ts",
+      "import": "./dist/esm/debug.js",
+      "require": "./dist/cjs/debug.js"
+    },
+    "./react": {
+      "types": "./dist/types/packages/react.d.ts",
+      "import": "./dist/esm/react.js",
+      "require": "./dist/cjs/react.js"
+    },
+    "./react-native": {
+      "types": "./dist/types/packages/react-native.d.ts",
+      "import": "./dist/esm/react-native.js",
+      "require": "./dist/cjs/react-native.js"
+    },
+    "./ai": {
+      "types": "./dist/types/packages/ai.d.ts",
+      "import": "./dist/esm/ai.js",
+      "require": "./dist/cjs/ai.js"
+    },
+    "./plugins": {
+      "types": "./dist/types/packages/plugins.d.ts",
+      "import": "./dist/esm/plugins.js",
+      "require": "./dist/cjs/plugins.js"
+    },
+    "./master": {
+      "types": "./dist/types/packages/master.d.ts",
+      "import": "./dist/esm/master.js",
+      "require": "./dist/cjs/master.js"
+    },
+    "./multiplayer": {
+      "types": "./dist/types/packages/multiplayer.d.ts",
+      "import": "./dist/esm/multiplayer.js",
+      "require": "./dist/cjs/multiplayer.js"
+    },
+    "./internal": {
+      "types": "./dist/types/packages/internal.d.ts",
+      "import": "./dist/esm/internal.js",
+      "require": "./dist/cjs/internal.js"
+    },
+    "./testing": {
+      "types": "./dist/types/packages/testing.d.ts",
+      "import": "./dist/esm/testing.js",
+      "require": "./dist/cjs/testing.js"
+    },
+    "./server": {
+      "types": "./dist/types/packages/server.d.ts",
+      "import": "./dist/esm/server.js",
+      "require": "./dist/cjs/server.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/**/*.test.js",
+    "!src/**/*.test.jsx",
+    "!src/client/debug/tests",
+    "dist/boardgameio.js",
+    "dist/boardgameio.min.js",
+    "dist/boardgameio.es.js",
+    "dist/esm",
+    "dist/cjs",
+    "dist/types",
+    "client",
+    "core",
+    "debug",
+    "react",
+    "react-native",
+    "server",
+    "ai",
+    "plugins",
+    "master",
+    "multiplayer",
+    "internal",
+    "testing"
+  ],
+  "keywords": [
+    "board games",
+    "card games",
+    "tabletop games",
+    "game engine"
+  ],
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": ">=10.16"
+  },
+  "author": "nicolodavis@gmail.com",
   "license": "MIT",
+  "funding": [
+    "https://github.com/boardgameio/boardgame.io?sponsor=1",
+    {
+      "type": "opencollective",
+      "url": "https://opencollective.com/boardgameio"
+    }
+  ],
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/node": "^7.29.0",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+    "@babel/plugin-transform-dynamic-import": "^7.29.7",
+    "@babel/plugin-transform-modules-commonjs": "^7.28.6",
+    "@babel/preset-env": "^7.29.5",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@eslint/js": "^9.39.5",
+    "@rollup/plugin-babel": "^7.1.0",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.2",
+    "@rollup/plugin-replace": "^6.0.2",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/svelte": "5.4.2",
+    "@types/cors": "^2.8.19",
+    "@types/jest": "^30.0.0",
+    "@types/js-cookie": "^3.0.6",
+    "@types/koa__cors": "^5.0.1",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "benchmark": "^2.1.4",
+    "cross-env": "^10.1.0",
+    "docsify-cli": "^5.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jest": "^29.16.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-unicorn": "^56.0.1",
+    "globals": "^17.8.0",
+    "husky": "^9.1.7",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.3.0",
+    "jest-date-mock": "^1.0.10",
+    "jest-environment-jsdom": "^30.2.0",
+    "lint-staged": "^17.0.2",
+    "node-persist": "^4.0.4",
+    "nodemon": "^3.1.14",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.8.3",
+    "publint": "^0.3.22",
+    "raf": "^3.4.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "rollup": "^4.60.3",
+    "rollup-plugin-svelte": "^7.2.3",
+    "rollup-plugin-typescript2": "^0.37.0",
+    "shelljs": "^0.10.0",
+    "supertest": "^7.2.2",
+    "svelte": "^5.0.0",
+    "tempy": "^1.0.1",
+    "ts-jest": "^29.4.9",
+    "typescript": "^6.0.3"
+  },
   "dependencies": {
-    "express": "^4.21.2",
-    "qrcode": "^1.5.4",
-    "socket.io": "^4.8.1"
+    "@koa/bodyparser": "^6.1.0",
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^15.5.0",
+    "@types/koa": "^3.0.2",
+    "@types/koa__router": "^12.0.5",
+    "cors": "^2.8.6",
+    "flatted": "^3.4.2",
+    "immer": "^11.1.7",
+    "js-cookie": "^3.0.5",
+    "koa": "^3.2.0",
+    "lodash.isplainobject": "^4.0.6",
+    "nanoid": "^6.0.0",
+    "p-queue": "^9.3.3",
+    "prop-types": "^15.8.1",
+    "redux": "^5.0.1",
+    "rfc6902": "^5.2.0",
+    "setimmediate": "^1.0.5",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "svelte-json-tree-auto": "^0.1.0",
+    "ts-toolbelt": "^9.6.0"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": true
+    }
+  },
+  "jest": {
+    "preset": "ts-jest/presets/js-with-babel",
+    "testEnvironment": "jsdom",
+    "testEnvironmentOptions": {
+      "customExportConditions": [
+        "node",
+        "node-addons"
+      ]
+    },
+    "moduleNameMapper": {
+      "\\.(css)$": "identity-obj-proxy",
+      "\\.(svg)$": "<rootDir>/.empty_module.js",
+      "svelte-json-tree-auto": "<rootDir>/src/client/debug/tests/JSONTree.mock.svelte",
+      "^svelte$": "<rootDir>/node_modules/svelte/src/index-client.js",
+      "^svelte/legacy$": "<rootDir>/node_modules/svelte/src/legacy/legacy-client.js",
+      "^svelte/reactivity$": "<rootDir>/node_modules/svelte/src/reactivity/index-client.js",
+      "^svelte/store$": "<rootDir>/node_modules/svelte/src/store/index-client.js"
+    },
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "src/client/transport/dummy",
+      "src/client/debug/.*",
+      "src/types.ts"
+    ],
+    "setupFiles": [
+      "<rootDir>/jest.setup.js",
+      "raf/polyfill",
+      "jest-date-mock"
+    ],
+    "setupFilesAfterEnv": [
+      "@testing-library/jest-dom"
+    ],
+    "transform": {
+      "^.+\\.svelte$": "<rootDir>/jest-svelte-transformer.cjs"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/\\.pnpm/(?!(boardgame.io|flatted|nanoid|p-queue|p-timeout|svelte|svelte-json-tree-auto|esm-env|devalue|zimmerframe|@testing-library\\+(svelte|svelte-core))@|@testing-library\\+svelte-cor_)",
+      "node_modules/(?!\\.pnpm/)(?!(boardgame.io|flatted|nanoid|p-queue|p-timeout|svelte|svelte-json-tree-auto|esm-env|devalue|zimmerframe|@testing-library/(svelte|svelte-core))/)"
+    ],
+    "testPathIgnorePatterns": [
+      "examples/",
+      "integration/",
+      "node_modules/",
+      ".npm/",
+      ".claude/"
+    ]
   }
 }
