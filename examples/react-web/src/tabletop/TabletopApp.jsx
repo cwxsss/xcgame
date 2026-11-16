@@ -389,6 +389,8 @@ function Room({ room }) {
   const [showInvite, setShowInvite] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [startingWithAI, setStartingWithAI] = useState(false);
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [rematchError, setRematchError] = useState('');
   const game = games[room.game];
   const GameClient = clients[room.game];
   const inviteUrl = new URL(roomHash(room), window.location.origin).href;
@@ -433,6 +435,24 @@ function Room({ room }) {
     }
   }
 
+  async function rematch() {
+    if (rematchBusy) return;
+    setRematchBusy(true);
+    setRematchError('');
+    try {
+      const result = await request(`${roomPath(room)}/rematch`, {
+        playerID: seat.playerID,
+        credentials: seat.credentials,
+      });
+      const nextRoom = { game: room.game, matchID: result.matchID };
+      saveSeat(nextRoom, result);
+      openRoom(nextRoom);
+    } catch {
+      setRematchError('暂时无法进入新一局，请重试。');
+    } finally {
+      setRematchBusy(false);
+    }
+  }
   async function startWithAI() {
     if (startingWithAI) return;
     setStartingWithAI(true);
@@ -536,6 +556,9 @@ function Room({ room }) {
               playerID={seat.playerID}
               credentials={seat.credentials}
               onWaitingChange={setWaiting}
+              {...(room.game === 'splendor'
+                ? { onRematch: rematch, rematchBusy, rematchError }
+                : {})}
               {...(seat.playerID === '0'
                 ? { onStartWithAI: startWithAI, startingWithAI }
                 : {})}

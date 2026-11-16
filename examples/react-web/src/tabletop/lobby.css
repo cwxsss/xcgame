@@ -297,11 +297,11 @@ a {
 }
 
 @media (min-width: 621px) {
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-site-header {
+  .tt-site:has(.splendor-mobile) .tt-site-header {
     display: none;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-main {
+  .tt-site:has(.splendor-mobile) .tt-main {
     display: flex;
     flex-direction: column;
     width: min(1280px, calc(100% - 24px));
@@ -309,16 +309,16 @@ a {
     padding-bottom: 10px;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .splendor-board {
+  .tt-site:has(.splendor-mobile) .splendor-board {
     width: 100%;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header {
+  .tt-site:has(.splendor-mobile) .tt-room-header {
     margin: 0;
     padding-block: 8px;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header > div {
+  .tt-site:has(.splendor-mobile) .tt-room-header > div {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
@@ -326,34 +326,34 @@ a {
     min-width: 0;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header h1 {
+  .tt-site:has(.splendor-mobile) .tt-room-header h1 {
     font-size: 1.25rem;
     margin: 0;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .tt-room-header p {
+  .tt-site:has(.splendor-mobile) .tt-room-header p {
     margin: 0;
     font-size: 0.8rem;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .voice-panel.is-collapsed {
+  .tt-site:has(.splendor-mobile) .voice-panel.is-collapsed {
     position: static;
     align-self: flex-end;
     margin-top: auto;
     padding-top: 3px;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher {
+  .tt-site:has(.splendor-mobile) .voice-launcher {
     min-height: 38px;
     padding: 3px 8px;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher-icon {
+  .tt-site:has(.splendor-mobile) .voice-launcher-icon {
     width: 27px;
     height: 27px;
   }
 
-  .tt-site:has(.splendor-desktop .splendor-layout) .voice-launcher-copy > span {
+  .tt-site:has(.splendor-mobile) .voice-launcher-copy > span {
     display: none;
   }
 }

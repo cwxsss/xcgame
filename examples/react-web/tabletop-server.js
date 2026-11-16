@@ -1,8 +1,10 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, extname, resolve, sep } from 'node:path';
 import { bodyParser } from '@koa/bodyparser';
 import { INVALID_MOVE } from 'boardgame.io/core';
+import { createMatch } from 'boardgame.io/internal';
 import { Master } from 'boardgame.io/master';
 import { Origins, Server, SocketIO } from 'boardgame.io/server';
 import { Avalon } from './src/tabletop/avalon';
@@ -89,11 +91,12 @@ function botMove(gameName, state) {
   );
 }
 
-function nextDeadline(G) {
+function nextDeadline(gameName, G) {
+  const legacySplendor = gameName === 'splendor' && G.afkPlayers == null;
   const clocks = G.actionClocks;
   return Math.min(
     ...Object.entries(clocks?.deadlines ?? {})
-      .filter(([id]) => !clocks.marked?.includes(id))
+      .filter(([id]) => legacySplendor || !clocks.marked?.includes(id))
       .map(([, deadline]) => deadline),
   );
 }
@@ -110,7 +113,7 @@ function scheduleRoom(gameName, matchID, delay = 400) {
         let { state } = await server.db.fetch(matchID, { state: true });
         if (!state || state.ctx.gameover) return;
         const move =
-          nextDeadline(state.G) <= Date.now()
+          nextDeadline(gameName, state.G) <= Date.now()
             ? {
                 playerID:
                   gameName === 'splendor' ? state.ctx.currentPlayer : '0',
@@ -124,7 +127,7 @@ function scheduleRoom(gameName, matchID, delay = 400) {
           if (!state || state.ctx.gameover || state._stateID <= before) return;
         }
         const delay = Math.min(
-          nextDeadline(state.G) - Date.now(),
+          nextDeadline(gameName, state.G) - Date.now(),
           botMove(gameName, state) ? 400 : Infinity,
         );
         if (Number.isFinite(delay))
@@ -208,7 +211,75 @@ const webRoot = resolve(
 const matchPath =
   /^\/games\/(splendor|avalon)\/([A-Za-z0-9_-]{1,80})(?:\/([^/]+))?$/;
 const listPath = /^\/games(?:\/(splendor|avalon))?$/;
-const parseAIRequest = bodyParser({ enableTypes: ['json'], jsonLimit: '2kb' });
+const parseRoomRequest = bodyParser({
+  enableTypes: ['json'],
+  jsonLimit: '2kb',
+});
+
+async function rematch(ctx, matchID) {
+  const { metadata, state } = await server.db.fetch(matchID, {
+    metadata: true,
+    state: true,
+  });
+  if (metadata?.gameName !== 'splendor' || !state) ctx.throw(404);
+  const { playerID, credentials } = ctx.request.body ?? {};
+  if (
+    typeof playerID !== 'string' ||
+    !/^[0-3]$/.test(playerID) ||
+    !(await server.auth.authenticateCredentials({
+      playerID,
+      credentials,
+      metadata,
+    }))
+  ) {
+    ctx.throw(403);
+  }
+  if (!state.ctx.gameover) ctx.throw(409);
+
+  const nextMatchID =
+    'replay-' + createHash('sha256').update(matchID).digest('hex');
+  let { metadata: nextMatch } = await server.db.fetch(nextMatchID, {
+    metadata: true,
+  });
+  if (!nextMatch) {
+    const { metadata: nextMetadata, initialState } = createMatch({
+      game: games.find(({ name }) => name === 'splendor'),
+      numPlayers: state.ctx.numPlayers,
+      unlisted: true,
+    });
+    for (const [id, seat] of Object.entries(metadata.players)) {
+      if (seat.credentials) {
+        nextMetadata.players[id] = {
+          ...nextMetadata.players[id],
+          name: seat.name,
+          credentials: randomUUID(),
+        };
+      }
+    }
+    const bots = state.G.bots ?? [];
+    initialState.G = {
+      ...initialState.G,
+      actionSeconds: state.G.actionSeconds ?? 60,
+      bots,
+      ready: initialState.G.ready.map((_, index) =>
+        bots.includes(String(index)),
+      ),
+    };
+    await server.db.createMatch(nextMatchID, {
+      metadata: nextMetadata,
+      initialState,
+    });
+    nextMatch = nextMetadata;
+  }
+
+  const seat = nextMatch.players[playerID];
+  if (!seat?.credentials) ctx.throw(403);
+  ctx.body = {
+    matchID: nextMatchID,
+    playerID,
+    playerCredentials: seat.credentials,
+  };
+}
 
 server.app.use(async (ctx, next) => {
   let pathname;
@@ -244,8 +315,19 @@ server.app.use(async (ctx, next) => {
     if (ctx.method === 'POST' && action === 'join') {
       return server.transport.getMatchQueue(matchID).add(handleRoom);
     }
+    if (
+      ctx.method === 'POST' &&
+      gameName === 'splendor' &&
+      action === 'rematch'
+    ) {
+      return parseRoomRequest(ctx, () =>
+        server.transport
+          .getMatchQueue(matchID)
+          .add(() => rematch(ctx, matchID)),
+      );
+    }
     if (ctx.method === 'POST' && action === 'start-ai') {
-      return parseAIRequest(ctx, () =>
+      return parseRoomRequest(ctx, () =>
         server.transport.getMatchQueue(matchID).add(async () => {
           const { metadata, state } = await server.db.fetch(matchID, {
             metadata: true,
@@ -312,6 +394,18 @@ server
   .run({
     host: process.env.HOST || '127.0.0.1',
     port: Number(process.env.PORT || 8000),
+  })
+  .then(async () => {
+    const matches = await server.db.listMatches({
+      gameName: 'splendor',
+      where: { isGameover: false },
+    });
+    for (const matchID of matches) {
+      const { state } = await server.db.fetch(matchID, { state: true });
+      if (state?.G.started && state.G.afkPlayers != null) {
+        scheduleRoom('splendor', matchID);
+      }
+    }
   })
   .catch((error) => {
     console.error(error);

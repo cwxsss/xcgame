@@ -56,6 +56,8 @@ function initialState({ ctx }) {
     finalRound: false,
     finished: false,
     actionSeconds: 60,
+    timeoutCounts: {},
+    afkPlayers: [],
   };
 }
 
@@ -70,9 +72,43 @@ function updateSplendorActionClocks({ G, ctx }) {
   const playerID = ctx.currentPlayer;
   return updateClocks(G, {
     label: finished ? null : label,
-    seats: finished || playerID == null ? [] : [playerID],
+    seats:
+      finished || playerID == null || G.afkPlayers?.includes(String(playerID))
+        ? []
+        : [playerID],
     key: [ctx.turn, playerID, G.pending ?? 'action', finished].join(':'),
   });
+}
+
+function markSplendorTimeout(G, playerID) {
+  const clocks = G.actionClocks;
+  const deadline = clocks?.deadlines?.[playerID];
+  const legacyRoom = G.afkPlayers == null;
+  if (
+    !deadline ||
+    deadline > Date.now() ||
+    (!legacyRoom && clocks.marked?.includes(playerID))
+  )
+    return false;
+  G.timeoutCounts = legacyRoom ? {} : { ...G.timeoutCounts };
+  G.afkPlayers ??= [];
+  G.timeoutCounts[playerID] = Math.min(5, (G.timeoutCounts[playerID] ?? 0) + 1);
+  G.actionClocks = {
+    ...clocks,
+    marked: [...new Set([...(clocks.marked ?? []), playerID])],
+  };
+  return true;
+}
+
+function returnTokensToBank(G, player, count = totalTokens(player.tokens)) {
+  let remaining = Math.max(0, count);
+  for (const color of RESOURCES) {
+    if (!remaining) break;
+    const returned = Math.min(remaining, player.tokens[color] ?? 0);
+    player.tokens[color] -= returned;
+    G.tokens[color] += returned;
+    remaining -= returned;
+  }
 }
 
 function removeMarketCard(G, tier, index) {
@@ -91,12 +127,24 @@ function receiveNoble(G, player, noble) {
   player.points += noble.points;
 }
 
-function finishTurn({ G, ctx, events, playerID }) {
+function finishTurn({
+  G,
+  ctx,
+  events,
+  playerID,
+  timedOut = false,
+  removePlayer = false,
+}) {
   G.pending = null;
   const player = G.players[Number(playerID)];
+  if (!timedOut) {
+    G.timeoutCounts = { ...(G.timeoutCounts ?? {}), [playerID]: 0 };
+  }
   if (player.points >= 15) G.finalRound = true;
   if (G.finalRound && playerID === ctx.playOrder.at(-1)) {
     G.finished = true;
+  } else if (removePlayer) {
+    events.pass({ remove: true });
   } else {
     events.endTurn();
   }
@@ -104,6 +152,7 @@ function finishTurn({ G, ctx, events, playerID }) {
 
 function finishAction(context) {
   const { G, playerID } = context;
+  G.timeoutCounts = { ...(G.timeoutCounts ?? {}), [playerID]: 0 };
   const player = G.players[Number(playerID)];
   if (totalTokens(player.tokens) > 10) {
     G.pending = 'return';
@@ -116,6 +165,34 @@ function finishAction(context) {
   }
   if (nobles.length === 1) receiveNoble(G, player, nobles[0]);
   finishTurn(context);
+}
+
+function timeoutTurn(context) {
+  const { G, ctx, playerID } = context;
+  if (String(ctx.currentPlayer) !== String(playerID)) return INVALID_MOVE;
+  if (!markSplendorTimeout(G, String(playerID))) return INVALID_MOVE;
+
+  const player = G.players[Number(playerID)];
+  const pending = G.pending;
+  if (pending === 'return') {
+    returnTokensToBank(G, player, totalTokens(player.tokens) - 10);
+  }
+  if (pending === 'return' || pending === 'noble') {
+    const noble = eligibleNobles(player, G.nobles)[0];
+    if (noble) receiveNoble(G, player, noble);
+  }
+
+  const removePlayer = (G.timeoutCounts[String(playerID)] ?? 0) >= 3;
+  if (removePlayer) {
+    returnTokensToBank(G, player);
+    G.afkPlayers = [...new Set([...(G.afkPlayers ?? []), String(playerID)])];
+  }
+  if (removePlayer && ctx.playOrder.length === 1) {
+    G.pending = null;
+    G.finished = true;
+    return;
+  }
+  finishTurn({ ...context, timedOut: true, removePlayer });
 }
 
 const readyUp = {
@@ -214,7 +291,7 @@ const playMoves = {
   },
 
   buyCard(context, source, tier, index) {
-    const { G, playerID } = context;
+    const { G, ctx, playerID } = context;
     if (G.pending || !Number.isInteger(index) || index < 0) return INVALID_MOVE;
     const player = G.players[Number(playerID)];
     const card =
@@ -233,6 +310,11 @@ const playMoves = {
     player.points += card.points;
     player.bonuses[card.color]++;
     player.cards.push(card);
+    player.lastPurchase = {
+      card: { ...card, requirements: { ...card.requirements } },
+      payment,
+      turn: ctx.turn,
+    };
     if (source === 'reserved') player.reserved.splice(index, 1);
     else removeMarketCard(G, tier, index);
     finishAction(context);
@@ -294,13 +376,22 @@ export const Splendor = {
         ...Object.fromEntries(
           Object.entries(playMoves).map(([name, move]) => [
             name,
-            { move, client: false },
+            {
+              client: false,
+              move(context, ...args) {
+                const { G, playerID } = context;
+                const deadline = G.actionClocks?.deadlines?.[playerID];
+                if (deadline != null && deadline <= Date.now())
+                  return INVALID_MOVE;
+                return move(context, ...args);
+              },
+            },
           ]),
         ),
         markActionTimeouts: {
           client: false,
           noLimit: true,
-          move: ({ G }) => G,
+          move: timeoutTurn,
         },
       },
     },
@@ -314,10 +405,14 @@ export const Splendor = {
         cards: player.cards.length,
       }))
       .sort((a, b) => b.points - a.points || a.cards - b.cards);
-    const winners = scores
+    const activeScores = scores.filter(
+      ({ playerID }) => !G.afkPlayers?.includes(playerID),
+    );
+    const winners = activeScores
       .filter(
         (score) =>
-          score.points === scores[0].points && score.cards === scores[0].cards,
+          score.points === activeScores[0].points &&
+          score.cards === activeScores[0].cards,
       )
       .map(({ playerID }) => playerID);
     return { winners, scores };

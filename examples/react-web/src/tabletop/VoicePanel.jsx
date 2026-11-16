@@ -54,9 +54,12 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   const modeRef = useRef('toggle');
   const relayRef = useRef(null);
   const joinAttemptRef = useRef(0);
+  const joiningRef = useRef(false);
   const launcherRef = useRef(null);
   const speakingRef = useRef(false);
   const talkPointerIdRef = useRef(null);
+  const pendingTalkRef = useRef(false);
+  const pendingToggleRef = useRef(false);
   const toastTimer = useRef(null);
 
   const [joined, setJoined] = useState(false);
@@ -141,6 +144,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
         existing.name = peer.name;
         return existing;
       }
+      if (typeof RTCPeerConnection === 'undefined') return null;
 
       const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
       const record = { pc, name: peer.name || '玩家', offerStarted: false };
@@ -163,7 +167,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       };
 
       pc.ontrack = (event) => {
-        const stream = event.streams && event.streams[0];
+        const stream = event.streams?.[0] || new MediaStream([event.track]);
         if (!stream) return;
         remoteStreamsRef.current.set(peer.id, stream);
         setRemoteStreams((current) => ({ ...current, [peer.id]: stream }));
@@ -263,12 +267,15 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   );
 
   const unlockRemoteAudio = useCallback(async () => {
+    let played = false;
     try {
-      await relayRef.current?.resume();
+      if (relayRef.current) {
+        await relayRef.current.resume();
+        played = true;
+      }
     } catch (_) {
       // The HTML audio elements can still be played independently.
     }
-    let played = false;
     for (const audio of audioElementsRef.current.values()) {
       try {
         await audio.play();
@@ -283,11 +290,14 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
 
   const disconnect = useCallback(() => {
     joinAttemptRef.current++;
+    joiningRef.current = false;
     joinedRef.current = false;
     setJoined(false);
     setConnectionState('idle');
     speakingRef.current = false;
     talkPointerIdRef.current = null;
+    pendingTalkRef.current = false;
+    pendingToggleRef.current = false;
     setLocalAudioEnabled(false);
     setSpeaking(false);
 
@@ -312,7 +322,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   }, [removePeer, setLocalAudioEnabled]);
 
   const join = useCallback(async () => {
-    if (joinedRef.current) return;
+    if (joinedRef.current || joiningRef.current) return;
     setErrorMessage('');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setErrorMessage(
@@ -320,12 +330,17 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       );
       return;
     }
-    if (typeof RTCPeerConnection === 'undefined') {
+    if (
+      typeof RTCPeerConnection === 'undefined' &&
+      !window.AudioContext &&
+      !window.webkitAudioContext
+    ) {
       setErrorMessage('当前浏览器不支持实时语音，请更新浏览器后重试。');
       return;
     }
 
     setConnectionState('connecting');
+    joiningRef.current = true;
     const attempt = ++joinAttemptRef.current;
     try {
       const relay = createVoiceRelay((frame) => {
@@ -343,6 +358,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       void relay?.resume().catch(() => setAudioBlocked(true));
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          channelCount: { ideal: 1 },
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -355,7 +371,19 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       localStreamRef.current = stream;
       // Joining never opens the microphone unexpectedly.
       setLocalAudioEnabled(false);
-      void relay?.attach(stream).catch(() => {});
+      // Wait until the relay has attached before exposing the joined controls.
+      // Otherwise a fast press-and-hold can enable the track before the
+      // AudioWorklet exists, losing the first (and sometimes all) frames.
+      await relay?.attach(stream).catch(() => {});
+      if (attempt !== joinAttemptRef.current || !joiningRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        if (localStreamRef.current === stream) localStreamRef.current = null;
+        if (relayRef.current === relay) {
+          relay?.close();
+          relayRef.current = null;
+        }
+        return;
+      }
 
       const socket = io(VOICE_NAMESPACE, {
         autoConnect: false,
@@ -370,10 +398,20 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
           announced = true;
           showVoiceToast('已加入语音');
         }
+        if (modeRef.current === 'push' && pendingTalkRef.current) {
+          speakingRef.current = true;
+          setLocalAudioEnabled(true);
+          setSpeaking(true);
+        } else if (modeRef.current === 'toggle' && pendingToggleRef.current) {
+          pendingToggleRef.current = false;
+          setLocalAudioEnabled(true);
+        }
       });
       socket.on('disconnect', (reason) => {
         speakingRef.current = false;
         talkPointerIdRef.current = null;
+        pendingTalkRef.current = false;
+        pendingToggleRef.current = false;
         setLocalAudioEnabled(false);
         setSpeaking(false);
         for (const id of peerConnectionsRef.current.keys()) removePeer(id);
@@ -391,6 +429,8 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
         }
       });
       socket.on('connect_error', (error) => {
+        pendingTalkRef.current = false;
+        pendingToggleRef.current = false;
         setConnectionState('error');
         setErrorMessage('语音服务暂时不可用，文字游戏不受影响。');
         if (error && error.message) console.warn('[voice]', error.message);
@@ -410,9 +450,11 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       });
       joinedRef.current = true;
       setJoined(true);
+      joiningRef.current = false;
       socket.connect();
     } catch (error) {
       if (attempt !== joinAttemptRef.current) return;
+      joiningRef.current = false;
       relayRef.current?.close();
       relayRef.current = null;
       setConnectionState('error');
@@ -435,9 +477,14 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   ]);
 
   const toggleMicrophone = useCallback(() => {
-    if (!joinedRef.current || modeRef.current !== 'toggle') return;
+    if (modeRef.current !== 'toggle') return;
+    if (!joinedRef.current) {
+      pendingToggleRef.current = true;
+      void join();
+      return;
+    }
     setLocalAudioEnabled(!micEnabledRef.current);
-  }, [setLocalAudioEnabled]);
+  }, [join, setLocalAudioEnabled]);
 
   const startTalking = useCallback(
     (event) => {
@@ -468,24 +515,32 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
           }
         }
       }
-      if (
-        !joinedRef.current ||
-        modeRef.current !== 'push' ||
-        speakingRef.current
-      )
+      if (modeRef.current !== 'push' || speakingRef.current) return;
+      if (!joinedRef.current) {
+        pendingTalkRef.current = true;
+        void join();
         return;
+      }
       speakingRef.current = true;
       setLocalAudioEnabled(true);
       setSpeaking(true);
     },
-    [setLocalAudioEnabled],
+    [join, setLocalAudioEnabled],
   );
 
   const stopTalking = useCallback(
     (event) => {
-      if (modeRef.current !== 'push' || !speakingRef.current) return;
+      if (modeRef.current !== 'push') return;
       event?.preventDefault();
+      if (
+        event?.pointerId !== undefined &&
+        talkPointerIdRef.current !== null &&
+        event.pointerId !== talkPointerIdRef.current
+      )
+        return;
       talkPointerIdRef.current = null;
+      pendingTalkRef.current = false;
+      if (!speakingRef.current) return;
       speakingRef.current = false;
       setLocalAudioEnabled(false);
       setSpeaking(false);
@@ -511,6 +566,8 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       modeRef.current = nextMode;
       speakingRef.current = false;
       talkPointerIdRef.current = null;
+      pendingTalkRef.current = false;
+      pendingToggleRef.current = false;
       setSpeaking(false);
       setLocalAudioEnabled(false);
     },
@@ -523,6 +580,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     if (modeRef.current === 'push') {
       speakingRef.current = false;
       talkPointerIdRef.current = null;
+      pendingTalkRef.current = false;
       setLocalAudioEnabled(false);
       setSpeaking(false);
     }
@@ -580,26 +638,126 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       aria-label="房间语音"
     >
       {!expanded ? (
-        <button
-          ref={launcherRef}
-          className={`voice-launcher ${micEnabled ? 'is-live' : ''}`}
-          type="button"
-          aria-label="打开房间语音控制"
-          aria-expanded={false}
-          onClick={() => setExpanded(true)}
-        >
-          <span className="voice-launcher-icon" aria-hidden="true">
-            {micEnabled ? '🎙️' : '🔊'}
-          </span>
-          <span className="voice-launcher-copy">
-            <strong>语音</strong>
-            <span>{joined ? connectionLabel : '点击打开'}</span>
-          </span>
-          <span
-            className={`voice-launcher-status voice-status-${connectionState}`}
-            aria-hidden="true"
-          />
-        </button>
+        <>
+          <div className="voice-quick-controls" aria-label="快速语音控制">
+            <div
+              className="voice-quick-status"
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className={`voice-quick-status-dot voice-status-${connectionState}`}
+                aria-hidden="true"
+              />
+              <span>
+                {connectionState === 'connecting'
+                  ? '正在连接'
+                  : connectionState === 'error'
+                    ? '语音连接失败'
+                    : !joined
+                      ? '未加入'
+                      : connectionState === 'connecting'
+                        ? '连接中'
+                        : mode === 'push'
+                          ? speaking
+                            ? '正在说话'
+                            : '按住说话'
+                          : micEnabled
+                            ? '持续开麦'
+                            : '已静音'}
+              </span>
+            </div>
+            <div
+              className="voice-quick-mode"
+              role="group"
+              aria-label="选择说话方式"
+            >
+              <button
+                className={mode === 'toggle' ? 'is-selected' : ''}
+                type="button"
+                aria-pressed={mode === 'toggle'}
+                onClick={() => changeMode('toggle')}
+              >
+                持续
+              </button>
+              <button
+                className={mode === 'push' ? 'is-selected' : ''}
+                type="button"
+                aria-pressed={mode === 'push'}
+                onClick={() => changeMode('push')}
+              >
+                按住
+              </button>
+            </div>
+            {mode === 'toggle' ? (
+              <button
+                className={`voice-quick-action ${micEnabled ? 'is-live' : ''}`}
+                type="button"
+                aria-pressed={micEnabled}
+                onClick={toggleMicrophone}
+              >
+                {micEnabled ? '关麦' : joined ? '开麦' : '加入开麦'}
+              </button>
+            ) : (
+              <button
+                className={`voice-quick-talk ${speaking ? 'is-live' : ''}`}
+                type="button"
+                aria-label="按住说话，松开结束"
+                onPointerDown={startTalking}
+                onPointerUp={stopTalking}
+                onPointerCancel={stopTalking}
+                onLostPointerCapture={(event) => {
+                  if (event.pointerId === talkPointerIdRef.current)
+                    stopTalking();
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    (event.key === ' ' || event.key === 'Enter') &&
+                    !event.repeat
+                  )
+                    startTalking(event);
+                }}
+                onKeyUp={(event) => {
+                  if (event.key === ' ' || event.key === 'Enter')
+                    stopTalking(event);
+                }}
+                onBlur={stopTalking}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                {speaking ? '松开结束' : joined ? '按住说话' : '按住加入'}
+              </button>
+            )}
+            {joined && audioBlocked && (
+              <button
+                className="voice-quick-join"
+                type="button"
+                onClick={unlockRemoteAudio}
+              >
+                恢复收听
+              </button>
+            )}
+          </div>
+          <button
+            ref={launcherRef}
+            className={`voice-launcher ${micEnabled ? 'is-live' : ''}`}
+            type="button"
+            aria-label="打开房间语音控制"
+            aria-expanded={false}
+            onClick={() => setExpanded(true)}
+          >
+            <span className="voice-launcher-icon" aria-hidden="true">
+              {micEnabled ? '🎙️' : '🔊'}
+            </span>
+            <span className="voice-launcher-copy">
+              <strong>语音</strong>
+              <span>{joined ? connectionLabel : '点击打开'}</span>
+            </span>
+            <span
+              className={`voice-launcher-status voice-status-${connectionState}`}
+              aria-hidden="true"
+            />
+          </button>
+        </>
       ) : (
         <div className="voice-panel-content">
           <div className="voice-heading">

@@ -1,41 +1,56 @@
 const SAMPLE_RATE = 8000;
 const FRAME_SIZE = 320;
 
-// Capture speech at 8 kHz and encode each sample as an 8-bit companded value.
+function speechEncoder(inputRate, outputRate, frameSize, emit) {
+  let frame = new Uint8Array(frameSize);
+  let index = 0;
+  let phase = 0;
+  let sum = 0;
+  let count = 0;
+  return {
+    reset() {
+      index = phase = sum = count = 0;
+    },
+    push(channel) {
+      for (const sample of channel) {
+        sum += sample;
+        count++;
+        phase += outputRate;
+        if (phase < inputRate) continue;
+        phase -= inputRate;
+        const value = Math.max(-1, Math.min(1, sum / count));
+        const compressed =
+          (Math.sign(value) * Math.log1p(255 * Math.abs(value))) /
+          Math.log(256);
+        frame[index++] = Math.round((compressed + 1) * 127.5);
+        sum = count = 0;
+        if (index === frameSize) {
+          emit(frame.buffer);
+          frame = new Uint8Array(frameSize);
+          index = 0;
+        }
+      }
+    },
+  };
+}
+
+// Keep the relay's packet format compatible with clients already in a room.
 const processor = `
+const createEncoder = ${speechEncoder.toString()};
 class TabletopSpeech extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.frame = new Uint8Array(320);
-    this.index = 0;
-    this.phase = 0;
-    this.sum = 0;
-    this.count = 0;
+    this.encoder = createEncoder(sampleRate, ${SAMPLE_RATE}, ${FRAME_SIZE},
+      (frame) => this.port.postMessage(frame, [frame]));
     this.enabled = false;
     this.port.onmessage = ({ data }) => {
       this.enabled = data;
-      this.index = this.phase = this.sum = this.count = 0;
+      this.encoder.reset();
     };
   }
   process(inputs) {
     const channel = inputs[0]?.[0];
-    if (!channel || !this.enabled) return true;
-    for (const sample of channel) {
-      this.sum += sample;
-      this.count++;
-      this.phase += 8000;
-      if (this.phase < sampleRate) continue;
-      this.phase -= sampleRate;
-      const value = Math.max(-1, Math.min(1, this.sum / this.count));
-      const compressed = Math.sign(value) * Math.log1p(255 * Math.abs(value)) / Math.log(256);
-      this.frame[this.index++] = Math.round((compressed + 1) * 127.5);
-      this.sum = this.count = 0;
-      if (this.index === this.frame.length) {
-        this.port.postMessage(this.frame.buffer, [this.frame.buffer]);
-        this.frame = new Uint8Array(320);
-        this.index = 0;
-      }
-    }
+    if (channel && this.enabled) this.encoder.push(channel);
     return true;
   }
 }
@@ -49,30 +64,71 @@ export function createVoiceRelay(send) {
   const streams = new Map();
   let capture;
   let source;
+  let highPass;
+  let presence;
+  let compressor;
   let mutedOutput;
+  let legacyEncoder;
   let enabled = false;
   let closed = false;
 
   async function attach(stream) {
-    if (!context.audioWorklet) return;
-    const url = URL.createObjectURL(
-      new Blob([processor], { type: 'text/javascript' }),
-    );
-    try {
-      await context.audioWorklet.addModule(url);
-    } finally {
-      URL.revokeObjectURL(url);
+    if (context.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
+      const url = URL.createObjectURL(
+        new Blob([processor], { type: 'text/javascript' }),
+      );
+      try {
+        await context.audioWorklet.addModule(url);
+        if (closed) return;
+        capture = new AudioWorkletNode(context, 'tabletop-speech');
+        capture.port.onmessage = ({ data }) => {
+          if (enabled) send(data);
+        };
+        capture.port.postMessage(enabled);
+      } catch {
+        // Some mobile WebViews reject worklet modules created from a Blob.
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
     if (closed) return;
+    if (!capture && typeof context.createScriptProcessor === 'function') {
+      legacyEncoder = speechEncoder(
+        context.sampleRate,
+        SAMPLE_RATE,
+        FRAME_SIZE,
+        send,
+      );
+      capture = context.createScriptProcessor(1024, 1, 1);
+      capture.onaudioprocess = ({ inputBuffer }) => {
+        if (enabled) legacyEncoder.push(inputBuffer.getChannelData(0));
+      };
+    }
+    if (!capture) return;
+
     source = context.createMediaStreamSource(stream);
-    capture = new AudioWorkletNode(context, 'tabletop-speech');
+    highPass = context.createBiquadFilter();
+    highPass.type = 'highpass';
+    highPass.frequency.value = 95;
+    presence = context.createBiquadFilter();
+    presence.type = 'peaking';
+    presence.frequency.value = 1800;
+    presence.Q.value = 0.85;
+    presence.gain.value = 2.5;
+    compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = -22;
+    compressor.ratio.value = 2.5;
+    compressor.attack.value = 0.012;
+    compressor.release.value = 0.16;
     mutedOutput = context.createGain();
     mutedOutput.gain.value = 0;
-    capture.port.onmessage = ({ data }) => {
-      if (enabled) send(data);
-    };
-    capture.port.postMessage(enabled);
-    source.connect(capture).connect(mutedOutput).connect(context.destination);
+    source
+      .connect(highPass)
+      .connect(presence)
+      .connect(compressor)
+      .connect(capture)
+      .connect(mutedOutput)
+      .connect(context.destination);
   }
 
   function play(id, frame) {
@@ -108,12 +164,17 @@ export function createVoiceRelay(send) {
     remove: (id) => streams.delete(id),
     enable(value) {
       enabled = value;
-      capture?.port.postMessage(value);
+      capture?.port?.postMessage(value);
+      legacyEncoder?.reset();
     },
     close() {
       closed = true;
-      if (capture) capture.port.onmessage = null;
+      if (capture?.port) capture.port.onmessage = null;
+      if (legacyEncoder) capture.onaudioprocess = null;
       source?.disconnect();
+      highPass?.disconnect();
+      presence?.disconnect();
+      compressor?.disconnect();
       capture?.disconnect();
       mutedOutput?.disconnect();
       streams.clear();

@@ -24,6 +24,135 @@
 
 .voice-panel.is-collapsed {
   max-width: calc(100% - 24px);
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.voice-quick-controls {
+  align-items: center;
+  background: var(--voice-surface);
+  border: 1px solid rgba(20, 60, 53, 0.16);
+  border-radius: 14px;
+  box-shadow: var(--voice-shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: min(100%, 440px);
+  min-width: 0;
+  padding: 5px 7px;
+}
+
+.voice-quick-status {
+  align-items: center;
+  color: var(--voice-muted);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 5px;
+  line-height: 1.2;
+  max-width: 100px;
+  min-height: 30px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.voice-quick-status > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-quick-status-dot {
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 8px;
+  height: 8px;
+  width: 8px;
+}
+
+.voice-quick-status-dot.voice-status-idle {
+  background: #aab8b2;
+}
+
+.voice-quick-status-dot.voice-status-connecting {
+  background: #d6a72d;
+}
+
+.voice-quick-status-dot.voice-status-connected {
+  background: #28a66b;
+}
+
+.voice-quick-status-dot.voice-status-error {
+  background: #c9584d;
+}
+
+.voice-quick-mode {
+  background: #edf1ef;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.voice-quick-mode button,
+.voice-quick-action,
+.voice-quick-talk,
+.voice-quick-join {
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 4px 8px;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.voice-quick-mode button {
+  background: transparent;
+  color: #536860;
+}
+
+.voice-quick-mode button.is-selected {
+  background: #fffdf8;
+  box-shadow: 0 1px 4px rgba(20, 50, 44, 0.14);
+  color: var(--voice-accent);
+}
+
+.voice-quick-action,
+.voice-quick-talk,
+.voice-quick-join {
+  background: #edf1ef;
+  color: #36514a;
+}
+
+.voice-quick-action.is-live,
+.voice-quick-talk.is-live {
+  background: #1d705c;
+  box-shadow: 0 0 0 2px rgba(29, 112, 92, 0.18);
+  color: #fffdf8;
+}
+
+.voice-quick-talk {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.voice-quick-join {
+  background: #1d705c;
+  color: #fffdf8;
+}
+
+.voice-quick-mode button:hover,
+.voice-quick-action:hover,
+.voice-quick-talk:hover,
+.voice-quick-join:hover {
+  filter: brightness(0.96);
 }
 
 .voice-toast {
@@ -70,6 +199,7 @@
   color: var(--voice-ink);
   cursor: pointer;
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 9px;
   min-height: 52px;
   padding: 6px 13px 6px 8px;
@@ -90,7 +220,11 @@
 .voice-launcher:focus-visible,
 .voice-collapse-button:focus-visible,
 .voice-panel button:focus-visible,
-.voice-mode-select:focus-visible {
+.voice-mode-select:focus-visible,
+.voice-quick-mode button:focus-visible,
+.voice-quick-action:focus-visible,
+.voice-quick-talk:focus-visible,
+.voice-quick-join:focus-visible {
   outline: 3px solid rgba(29, 112, 92, 0.35);
   outline-offset: 2px;
 }
@@ -113,6 +247,7 @@
 .voice-launcher-copy {
   align-items: flex-start;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   line-height: 1.15;
   min-width: 0;
@@ -409,6 +544,30 @@
     width: min(360px, calc(100% - 24px));
   }
 
+  .voice-panel.is-collapsed {
+    gap: 5px;
+    max-width: calc(100% - 16px);
+  }
+
+  .voice-quick-controls {
+    border-radius: 12px;
+    gap: 3px;
+    max-width: min(100%, calc(100vw - 16px));
+    padding: 4px 5px;
+  }
+
+  .voice-quick-status {
+    max-width: 88px;
+  }
+
+  .voice-quick-mode button,
+  .voice-quick-action,
+  .voice-quick-talk,
+  .voice-quick-join {
+    min-height: 29px;
+    padding-inline: 6px;
+  }
+
   .voice-heading {
     align-items: flex-start;
   }
@@ -434,6 +593,14 @@
 }
 
 @media (max-width: 375px) {
+  .voice-quick-controls {
+    max-width: 100%;
+  }
+
+  .voice-quick-status {
+    max-width: 75px;
+  }
+
   .voice-launcher {
     gap: 7px;
     min-height: 48px;
@@ -467,5 +634,19 @@
   .voice-mic-button,
   .voice-talk-button {
     transition: none;
+  }
+}
+
+@media (max-width: 350px) {
+  .voice-quick-controls {
+    flex-wrap: nowrap;
+  }
+
+  .voice-quick-status {
+    padding-inline: 2px;
+  }
+
+  .voice-quick-status > span:last-child {
+    max-width: 32px;
   }
 }

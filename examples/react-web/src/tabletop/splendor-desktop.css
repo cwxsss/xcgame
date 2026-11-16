@@ -1,567 +1,261 @@
-/* Desktop Splendor is a compact table view. Keep this file scoped so the
-   narrow/mobile board can retain its deliberately dense card layout. */
+/* The desktop board follows the same reading order as the compact phone
+   board. The larger viewport is used for breathing room and card art, while
+   the action controls remain in the same place and keep the same labels. */
 @media (min-width: 621px) {
-  .splendor-board {
-    --splendor-ink: #1b2638;
-    --splendor-muted: #617083;
-  }
-
-  .splendor-desktop {
-    min-width: 0;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) {
+  .splendor-board > .splendor-mobile,
+  .splendor-board > .splendor-mobile-lobby {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 6px 10px;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) > .tabletop-status {
-    align-self: center;
-    margin: 0;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) > .avalon-timer {
-    grid-column: 2;
-    justify-self: end;
-    margin: 0;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) > .splendor-players-panel,
-  .splendor-desktop > .splendor-layout {
-    grid-column: 1 / -1;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) > .splendor-players-panel {
-    margin: 0;
-    padding: 5px 7px;
-  }
-
-  .splendor-desktop:has(> .splendor-layout) > .splendor-players-panel h2 {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .splendor-desktop > .tabletop-status {
-    gap: 5px;
-    margin-bottom: 6px;
-  }
-
-  .splendor-desktop > .tabletop-status .tabletop-pill {
-    padding: 4px 8px;
-    font-size: 0.78rem;
-  }
-
-  .splendor-desktop > .avalon-timer {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 0 0 7px;
-    padding: 7px 10px;
-    border-radius: 10px;
-    box-shadow: none;
-  }
-
-  .splendor-desktop > .avalon-timer h2 {
-    display: inline;
-    margin: 0 8px 0 0;
-    font-size: 0.78rem;
-  }
-
-  .splendor-desktop > .avalon-timer p,
-  .splendor-desktop > .avalon-timer span[role='status'] {
-    display: inline;
-    margin: 0 8px 0 0;
-    color: var(--splendor-muted);
-    font-size: 0.75rem;
-  }
-
-  .splendor-desktop > .avalon-timer .avalon-clock {
-    margin-right: 6px;
-    font-size: 1rem;
-  }
-
-  .splendor-desktop > .avalon-timer form {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-  }
-
-  .splendor-desktop > .avalon-timer form label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.75rem;
-    white-space: nowrap;
-  }
-
-  .splendor-desktop > .avalon-timer form input {
-    width: 58px;
-    padding: 4px 5px;
-  }
-
-  .splendor-desktop > .avalon-timer form .tabletop-actions {
-    gap: 4px;
-  }
-
-  .splendor-desktop > .avalon-timer form button {
-    padding: 5px 8px;
-    font-size: 0.75rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel {
-    margin-bottom: 7px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    box-shadow: none;
-  }
-
-  .splendor-desktop > .splendor-players-panel h2 {
-    display: inline-block;
-    margin: 0 8px 5px 0;
-    font-size: 0.86rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel .splendor-player-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .splendor-desktop > .splendor-players-panel .splendor-player {
-    min-width: 0;
-    padding: 6px 7px;
-    border-radius: 8px;
-    font-size: 0.75rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel .splendor-player strong,
-  .splendor-desktop > .splendor-players-panel .splendor-player p {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .splendor-desktop > .splendor-players-panel .splendor-player p {
-    margin: 3px 0 0;
-    color: var(--splendor-muted);
-    font-size: 0.7rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel .splendor-token-row {
-    gap: 3px;
-    margin-top: 3px;
-  }
-
-  .splendor-desktop > .splendor-players-panel .gem {
-    min-width: 17px;
-    height: 17px;
-    font-size: 0.62rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel > .tabletop-note {
-    display: inline-block;
-    margin: 2px 8px 0 0;
-    padding: 3px 6px;
-    font-size: 0.7rem;
-  }
-
-  .splendor-desktop > .splendor-players-panel .tabletop-pregame-actions {
-    display: inline-flex;
-    gap: 5px;
-    vertical-align: middle;
-  }
-
-  .splendor-desktop > .splendor-players-panel .tabletop-pregame-actions button {
-    padding: 5px 8px;
-    font-size: 0.75rem;
-  }
-
-  .splendor-desktop > .splendor-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(246px, 318px);
-    grid-template-areas:
-      'return return'
-      'market supply'
-      'market nobles'
-      'market self';
-    align-items: start;
-    gap: 8px 10px;
-    margin-top: 0;
-  }
-
-  .splendor-desktop > .splendor-layout > .tabletop-card {
-    min-width: 0;
-    padding: 8px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(34, 56, 80, 0.06);
-  }
-
-  .splendor-desktop > .splendor-layout > .tabletop-card h2 {
-    margin: 0 0 6px;
-    font-size: 0.9rem;
-  }
-
-  .splendor-return-panel {
-    grid-area: return;
-  }
-
-  .splendor-supply-panel {
-    grid-area: supply;
-  }
-
-  .splendor-nobles-panel {
-    grid-area: nobles;
-  }
-
-  .splendor-market-panel {
-    grid-area: market;
-  }
-
-  .splendor-self-panel {
-    grid-area: self;
-  }
-
-  .splendor-desktop .splendor-token-row {
-    gap: 4px;
-  }
-
-  .splendor-desktop .splendor-token {
-    min-width: 0;
-    gap: 3px;
-    padding: 4px 5px;
-    border-radius: 7px;
-    font-size: 0.72rem;
-  }
-
-  .splendor-desktop .splendor-token .gem {
-    min-width: 19px;
-    height: 19px;
-    font-size: 0.62rem;
-  }
-
-  .splendor-desktop .splendor-supply-panel .tabletop-note,
-  .splendor-desktop .splendor-self-panel > p {
-    margin: 5px 0;
-    padding: 4px 6px;
-    font-size: 0.72rem;
-  }
-
-  .splendor-desktop .splendor-supply-panel .splendor-token-row {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .splendor-desktop .splendor-supply-panel .splendor-token {
-    justify-content: center;
-  }
-
-  .splendor-desktop .tabletop-actions {
-    gap: 4px;
-  }
-
-  .splendor-desktop .tabletop-actions button,
-  .splendor-desktop .tabletop-button {
-    padding: 5px 7px;
-    border-radius: 7px;
-    font-size: 0.72rem;
-  }
-
-  .splendor-desktop .splendor-return-panel p {
-    margin: 4px 0;
-    padding: 4px 6px;
-    font-size: 0.72rem;
-  }
-
-  .splendor-desktop .splendor-tier + .splendor-tier {
-    margin-top: 7px;
-  }
-
-  .splendor-desktop .splendor-tier-heading {
-    gap: 5px;
-    margin-bottom: 4px;
-  }
-
-  .splendor-desktop .splendor-tier-heading h3 {
-    font-size: 0.78rem;
-  }
-
-  .splendor-desktop .splendor-tier-heading .tabletop-button {
-    padding: 4px 6px;
-    font-size: 0.68rem;
-  }
-
-  .splendor-desktop .splendor-level {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .splendor-desktop .splendor-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto 92px auto auto;
-    align-items: center;
-    min-width: 0;
-    min-height: 0;
-    gap: 2px 4px;
-    padding: 6px;
-    border-radius: 9px;
-  }
-
-  .splendor-desktop .splendor-card-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    grid-column: 1 / -1;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .splendor-desktop .splendor-card-heading strong {
-    color: #8c5b13;
-    font-size: 0.82rem;
-    white-space: nowrap;
-  }
-
-  .splendor-card-bonus {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    clip-path: polygon(
-      50% 0%,
-      88% 24%,
-      100% 60%,
-      72% 100%,
-      28% 100%,
-      0% 60%,
-      12% 24%
-    );
-    color: #fff;
-    font-size: 0.65rem;
-    font-weight: 800;
-    line-height: 1;
-  }
-
-  .splendor-card-bonus.is-white {
-    background: #b8c3ce;
-    color: #243142;
-  }
-
-  .splendor-card-bonus.is-blue {
-    background: #3e75ba;
-  }
-
-  .splendor-card-bonus.is-green {
-    background: #4d9860;
-  }
-
-  .splendor-card-bonus.is-red {
-    background: #be514c;
-  }
-
-  .splendor-card-bonus.is-black {
-    background: #303743;
-  }
-
-  .splendor-desktop .splendor-card .splendor-desktop-portrait {
-    grid-column: 1 / -1;
-    width: 92px;
-    height: 92px;
+    width: min(1120px, calc(100vw - 48px));
+    max-width: 1120px;
     margin: 0 auto;
-    border-radius: 7px;
-    box-shadow: inset 0 0 0 1px #ffffff66;
+    padding: 7px 12px 8px;
+    gap: 5px;
+    border: 1px solid #e5d5ae;
+    border-radius: 16px;
+    background:
+      radial-gradient(circle at 92% 3%, #ffe8a8 0 7%, transparent 7.5%),
+      linear-gradient(145deg, #fff3c9 0%, #fffaf1 26%, #fff 82%);
+    box-shadow: 0 12px 34px rgba(90, 72, 34, 0.12);
   }
 
-  .splendor-desktop .splendor-card-cost {
+  .splendor-board > .splendor-mobile {
+    grid-template-rows: auto;
+  }
+
+  .splendor-mobile-status {
+    min-height: 24px;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-status > span {
+    padding: 3px 9px;
+  }
+
+  .splendor-mobile-players {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .splendor-mobile-players button {
+    min-height: 63px;
+    grid-template-columns: 22px minmax(0, 1fr);
+    column-gap: 6px;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .splendor-mobile-player-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  .splendor-mobile-players strong {
+    font-size: 14px;
+  }
+
+  .splendor-mobile-players span {
+    font-size: 12px;
+  }
+
+  .splendor-mobile-market {
+    gap: 5px;
+  }
+
+  .splendor-mobile-market-row {
+    grid-template-columns: 64px repeat(4, minmax(0, 1fr));
+    column-gap: clamp(8px, 1vw, 14px);
+  }
+
+  .splendor-mobile-tier-label {
+    border-radius: 10px;
+    padding: 6px;
+  }
+
+  .splendor-mobile-tier-label strong {
+    font-size: 16px;
+  }
+
+  .splendor-mobile-tier-label small {
+    font-size: 11px;
+  }
+
+  .splendor-mobile-tier-label button {
+    padding: 4px 5px;
+    font-size: 11px;
+  }
+
+  .splendor-mobile-market-card {
+    min-height: 84px;
+    grid-template-rows: 54px auto auto;
+    padding: 5px 7px;
+    border-radius: 11px;
+  }
+
+  .splendor-mobile-card-top {
+    font-size: 15px;
+  }
+
+  .splendor-mobile-card-art {
+    width: 54px;
+    height: 54px;
+  }
+
+  .splendor-mobile-cost-token {
+    min-width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .splendor-mobile-supply,
+  .splendor-mobile-self {
+    width: calc(100% - 18px);
+    margin-inline: auto;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .splendor-mobile-supply {
+    padding-block: 7px;
+  }
+
+  .splendor-mobile-supply .splendor-mobile-gem,
+  .splendor-mobile-self .splendor-mobile-gem {
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-supply .splendor-mobile-gem strong,
+  .splendor-mobile-self .splendor-mobile-gem strong {
+    font-size: 15px;
+  }
+
+  .splendor-mobile-action-panel {
+    min-height: 39px;
+    padding: 5px 8px;
+    border-radius: 10px;
+  }
+
+  .splendor-mobile-confirm-row button {
+    min-height: 34px;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-confirm-chips .splendor-mobile-cost-token {
+    min-width: 22px;
+    height: 22px;
+    font-size: 13px;
+  }
+
+  .splendor-mobile-self {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  .splendor-mobile-self-heading {
     grid-column: 1 / -1;
-    gap: 2px;
-    min-height: 19px;
-    margin-top: 0;
   }
 
-  .splendor-desktop .splendor-card-cost .gem {
-    min-width: 18px;
-    height: 18px;
-    font-size: 0.6rem;
+  .splendor-mobile-self > .splendor-mobile-gems,
+  .splendor-mobile-self > .splendor-mobile-bonus-row {
+    grid-column: 1;
   }
 
-  .splendor-desktop .splendor-card .tabletop-actions {
-    grid-column: 1 / -1;
-    margin-top: 2px;
+  .splendor-mobile-self > .splendor-mobile-reserved-row {
+    grid-column: 2;
+    grid-row: 2 / 4;
   }
 
-  .splendor-desktop .splendor-card .tabletop-actions button {
-    min-width: 0;
-    flex: 1 1 0;
-    padding-inline: 3px;
-    font-size: 0.68rem;
+  .splendor-mobile-self-heading {
+    font-size: 14px;
   }
 
-  .splendor-desktop .splendor-market-panel .splendor-card {
-    grid-template-columns: minmax(0, 1fr) minmax(64px, 0.9fr);
-    grid-template-rows: auto 1fr auto;
+  .splendor-mobile-reserved-row {
+    gap: 5px;
   }
 
-  .splendor-desktop .splendor-market-panel .splendor-card-heading {
-    grid-area: 1 / 2;
+  .splendor-mobile-reserved {
+    min-height: 53px;
+    padding: 4px;
   }
 
-  .splendor-desktop
-    .splendor-market-panel
-    .splendor-card
-    .splendor-desktop-portrait {
-    grid-area: 1 / 1 / 4 / 2;
-    width: min(92px, 100%);
-    height: auto;
-    aspect-ratio: 1;
+  .splendor-mobile-reserved-art {
+    width: 32px;
+    height: 34px;
   }
 
-  .splendor-desktop .splendor-market-panel .splendor-card-cost {
-    grid-area: 2 / 2;
+  .splendor-mobile-nobles {
+    gap: 6px;
   }
 
-  .splendor-desktop .splendor-market-panel .splendor-card .tabletop-actions {
-    grid-area: 3 / 2;
+  .splendor-mobile-noble-grid {
+    gap: 5px;
   }
 
-  .splendor-desktop .splendor-nobles-panel .splendor-player-row {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 3px;
+  .splendor-mobile-noble {
+    min-height: 48px;
+    padding: 4px;
   }
 
-  .splendor-desktop .splendor-noble-card {
-    min-width: 0;
-    padding: 4px 2px;
-    border-radius: 8px;
-    font-size: 0.7rem;
+  .splendor-mobile-noble-art {
+    width: 32px;
+    height: 32px;
   }
 
-  .splendor-desktop .splendor-noble-card strong {
-    display: block;
-    font-size: 0.72rem;
-  }
-
-  .splendor-desktop .splendor-noble-card .splendor-desktop-portrait {
-    width: min(42px, 100%);
-    height: auto;
-    aspect-ratio: 1;
-    margin: 1px auto;
-  }
-
-  .splendor-desktop .splendor-noble-card .splendor-card-cost {
-    margin-top: 2px;
-  }
-
-  .splendor-desktop .splendor-noble-card .splendor-card-cost .gem {
-    min-width: 12px;
-    height: 14px;
-    font-size: 0.59rem;
-    padding-inline: 2px;
-  }
-
-  .splendor-desktop .splendor-noble-card .tabletop-button {
-    width: 100%;
-    margin-top: 3px;
-    padding: 4px 3px;
-    font-size: 0.66rem;
-  }
-
-  .splendor-desktop .splendor-self-panel .splendor-level {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .splendor-desktop .splendor-self-panel > .splendor-token-row {
-    margin-bottom: 6px;
-  }
-
-  .splendor-desktop .splendor-self-panel .splendor-card-cost .gem {
-    min-width: 15px;
-    height: 16px;
-    padding-inline: 1px;
-  }
-
-  .splendor-desktop .splendor-self-panel h2 small {
-    margin-inline-start: 0.3rem;
-    color: var(--splendor-muted);
-    font-weight: 500;
-  }
-
-  .splendor-desktop .splendor-self-panel .splendor-card {
-    grid-template-rows: auto 48px auto auto;
-  }
-
-  .splendor-desktop
-    .splendor-self-panel
-    .splendor-card
-    .splendor-desktop-portrait {
-    width: min(48px, 100%);
-    height: auto;
-    aspect-ratio: 1;
-  }
-
-  .splendor-desktop
-    .splendor-self-panel
-    .splendor-card
-    .tabletop-actions
-    button {
-    font-size: 0.66rem;
-  }
-
-  .splendor-desktop .splendor-affordable-legend {
-    display: inline-block;
-    margin: 0 0 5px;
-    border: 1px solid #e7a2a2;
-    background: #fff5f5;
-    color: #a52a2a;
-    padding: 3px 6px;
-    font-size: 0.7rem;
-  }
-
-  .splendor-desktop .splendor-market-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
+  .splendor-mobile-lobby {
+    max-width: 760px;
+    margin-top: 12px;
   }
 }
 
-@media (min-width: 621px) and (max-width: 1020px) {
-  .splendor-desktop > .splendor-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(210px, 240px);
-  }
-
-  .splendor-desktop .splendor-level {
+@media (min-width: 621px) and (max-height: 800px) {
+  .splendor-board > .splendor-mobile {
     gap: 4px;
+    padding-block: 5px;
   }
 
-  .splendor-desktop .splendor-market-panel .splendor-card {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto;
+  .splendor-mobile-players button {
+    padding-block: 2px;
+    line-height: 1.15;
   }
 
-  .splendor-desktop
-    .splendor-market-panel
-    .splendor-card
-    :is(
-      .splendor-card-heading,
-      .splendor-desktop-portrait,
-      .splendor-card-cost,
-      .tabletop-actions
-    ) {
-    grid-area: auto / 1;
+  .splendor-mobile-players span {
+    font-size: 11px;
   }
 
-  .splendor-desktop
-    .splendor-market-panel
-    .splendor-card
-    .splendor-desktop-portrait {
-    width: min(75px, 100%);
+  .splendor-mobile-market-card {
+    min-height: 74px;
+    grid-template-rows: 48px auto auto;
+    padding-block: 3px;
+  }
+
+  .splendor-mobile-card-art {
+    width: 48px;
+    height: 48px;
+  }
+
+  .splendor-mobile-cost-token {
+    min-width: 18px;
+    height: 16px;
+    font-size: 10px;
+  }
+
+  .splendor-mobile-action-panel {
+    min-height: 34px;
+    padding-block: 2px;
+  }
+
+  .splendor-mobile-self .splendor-mobile-gem {
+    height: 30px;
+  }
+
+  .tt-site:has(.splendor-mobile) .tt-room-header {
+    padding-block: 6px;
+  }
+
+  .tt-site:has(.splendor-mobile) .voice-launcher {
+    min-height: 32px;
   }
 }

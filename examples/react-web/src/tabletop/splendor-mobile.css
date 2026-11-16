@@ -1,10 +1,164 @@
-/* The mobile board is a compact, glanceable table. Desktop markup remains untouched. */
-.splendor-mobile {
-  display: none;
+.splendor-result-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(18, 27, 42, 0.58);
 }
 
-.splendor-mobile-lobby {
-  display: none;
+.splendor-result-dialog {
+  width: min(430px, 100%);
+  max-height: min(88dvh, 640px);
+  overflow: auto;
+  border: 1px solid #d7a73a;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff8d8, #fffdf7 42%, #f8f3e7);
+  color: #27374c;
+  padding: 18px;
+  box-shadow: 0 22px 70px rgba(15, 25, 42, 0.32);
+  outline: none;
+}
+
+.splendor-result-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #ebd99f;
+  padding-bottom: 10px;
+}
+
+.splendor-result-heading > span {
+  font-size: 2rem;
+}
+
+.splendor-result-heading h2,
+.splendor-result-heading p {
+  margin: 0;
+}
+
+.splendor-result-heading h2 {
+  color: #7a4d08;
+  font-size: 1.25rem;
+}
+
+.splendor-result-heading p {
+  margin-top: 2px;
+  color: #9b752d;
+  font-size: 0.78rem;
+}
+
+.splendor-result-ranking {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.splendor-result-row {
+  display: grid;
+  grid-template-columns: 24px 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  border: 1px solid #eadfca;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 4px 7px;
+}
+
+.splendor-result-row.is-champion {
+  border-color: #d59a1f;
+  background: linear-gradient(100deg, #fff0aa, #fff9df);
+  box-shadow: 0 0 0 2px #f4cd6e inset;
+}
+
+.splendor-result-row.is-skipped {
+  opacity: 0.58;
+}
+
+.splendor-result-rank {
+  color: #846323;
+  text-align: center;
+}
+
+.splendor-result-avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e8eef2;
+  color: #708196;
+  font-size: 0.72rem;
+}
+
+.splendor-result-row.is-champion .splendor-result-avatar {
+  background: #ffd76a;
+  color: #8a5900;
+  font-size: 1.05rem;
+}
+
+.splendor-result-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.splendor-result-player b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-result-player em {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #d89c1f;
+  color: #fff9e2;
+  padding: 2px 5px;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.splendor-result-score {
+  color: #6d7a89;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.splendor-result-error {
+  margin: 8px 0 0;
+  border-radius: 6px;
+  background: #fff0f0;
+  color: #a32c2c;
+  padding: 5px 7px;
+  font-size: 0.78rem;
+}
+
+.splendor-result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.splendor-result-actions button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #1b7058;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.splendor-result-actions button.is-secondary {
+  border: 1px solid #b8a98a;
+  background: #fffdf7;
+  color: #67563a;
 }
 
 .splendor-card-portrait {
@@ -16,977 +170,1282 @@
   background-size: 400% 400%;
 }
 
-.splendor-desktop-portrait {
-  width: 64px;
-  height: 64px;
-  margin: 4px auto;
+.splendor-mobile,
+.splendor-mobile-lobby {
+  display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 4px;
+  box-sizing: border-box;
+  color: #203044;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
-.splendor-desktop .splendor-noble-card {
-  border-color: #b38a3b;
+.splendor-mobile {
+  grid-template-rows: 24px 38px minmax(164px, auto) repeat(4, auto);
+  padding: 2px 0 0;
+  background:
+    radial-gradient(circle at 90% 4%, #ffe8a8 0 7%, transparent 7.5%),
+    linear-gradient(145deg, #fff3c9 0%, #fffaf1 26%, #fff 82%);
+  border-radius: 10px;
+}
+
+.splendor-mobile button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.splendor-mobile-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.splendor-mobile-status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 999px;
+  background: #eef3f8;
+  padding: 3px 7px;
+}
+
+.splendor-mobile-status > .is-live {
+  background: #e3f6ed;
+  color: #0d7044;
+}
+
+.splendor-mobile-status > .is-warn {
+  background: #fff0d2;
+  color: #855800;
+}
+
+.splendor-mobile-turn-clock {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.splendor-mobile-clock {
+  display: inline-block;
+  min-width: 34px;
+  color: #25415d;
+  font-weight: 800;
+  text-align: center;
+}
+
+.splendor-mobile-clock.is-danger {
+  color: #af3c36;
+}
+
+.splendor-mobile-players {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.splendor-mobile-players button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 3px;
+  min-width: 0;
+  align-content: center;
+  overflow: hidden;
+  border: 1px solid #e1c982;
+  border-radius: 7px;
+  background: #fffdf6;
+  color: #4d6178;
+  padding: 2px 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.splendor-mobile-players button.is-current {
+  border-color: #df8d22;
+  box-shadow: 0 0 0 2px #ffe0a5 inset;
+}
+
+.splendor-mobile-players button.is-you {
+  background: #fff3d1;
+}
+
+.splendor-mobile-player-icon {
+  display: grid;
+  grid-row: span 2;
+  align-self: center;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f8c74d, #dd7d1a);
+  color: #fff9e2;
+  font-size: 8px;
+  box-shadow: 0 1px 2px #a85f1b55;
+}
+
+.splendor-mobile-players strong,
+.splendor-mobile-players span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-mobile-players strong {
+  color: #1f3651;
+  font-size: 10px;
+}
+
+.splendor-mobile-players span {
+  font-size: 9px;
+}
+
+.splendor-mobile-players em {
+  grid-column: 1 / -1;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.splendor-mobile-market {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.splendor-mobile-market-row {
+  display: grid;
+  grid-template-columns: 30px repeat(4, minmax(0, 1fr));
+  column-gap: 6px;
+  min-width: 0;
+}
+
+.splendor-mobile-tier-label {
+  display: grid;
+  grid-template-rows: 17px 12px 1fr;
+  align-items: center;
+  justify-items: center;
+  min-width: 0;
+  border-radius: 7px;
+  background: #f2e3c8;
+  color: #6e4d20;
+  padding: 2px;
+}
+
+.splendor-mobile-tier-label.is-level-2 {
+  background: #e2edf8;
+  color: #3f6389;
+}
+
+.splendor-mobile-tier-label.is-level-3 {
+  background: #eee8fa;
+  color: #65548b;
+}
+
+.splendor-mobile-tier-label strong {
+  font-size: 11px;
+}
+
+.splendor-mobile-tier-label small {
+  font-size: 8px;
+}
+
+.splendor-mobile-tier-label button {
+  min-width: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #ffffffa8;
+  color: inherit;
+  padding: 1px 2px;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.splendor-mobile-tier-label button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.splendor-mobile-market-card {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 32px auto;
+  align-content: center;
+  border: 1px solid #d7b276;
+  border-radius: 7px;
+  background: #fffdf7;
+  color: #27374c;
+  padding: 3px 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.splendor-mobile-market-card.is-level-2 {
+  border-color: #89a7c8;
+  background: #f8fbff;
+}
+
+.splendor-mobile-market-card.is-level-3 {
+  border-color: #9a8bc2;
+  background: #fbf8ff;
+}
+
+.splendor-mobile-market-card.is-selected {
+  border-color: #a87518;
+  box-shadow: 0 0 0 2px #f0d29b inset;
+  z-index: 2;
+  transform: scale(1.045);
+}
+
+.splendor-mobile-card-top {
+  grid-area: 1 / 1;
+  z-index: 1;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
+  font-size: 10px;
+}
+
+.splendor-mobile-card-top strong {
+  color: #8c5b13;
+  white-space: nowrap;
+}
+
+.splendor-mobile-card-art,
+.splendor-mobile-noble-art {
+  min-width: 0;
+  grid-area: 1 / 1;
+  justify-self: center;
+  width: 32px;
+  height: 32px;
+  box-shadow: inset 0 0 0 1px #ffffff66;
+}
+
+.splendor-mobile-market-card.is-level-2 .splendor-mobile-card-art {
+  filter: saturate(0.92) hue-rotate(7deg);
+}
+
+.splendor-mobile-market-card.is-level-3 .splendor-mobile-card-art {
+  filter: saturate(0.94) hue-rotate(-9deg);
+}
+
+.splendor-mobile-bonus,
+.splendor-mobile-mini-bonus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.splendor-mobile-bonus {
+  width: 14px;
+  height: 14px;
+  color: #fff;
+  font-size: 8px;
+}
+
+.splendor-mobile-bonus.is-white,
+.splendor-mobile-mini-bonus.is-white {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #8b98a5;
+  color: #243142;
+}
+
+.splendor-mobile-bonus.is-blue,
+.splendor-mobile-mini-bonus.is-blue {
+  background: #3e75ba;
+  color: #fff;
+}
+
+.splendor-mobile-bonus.is-green,
+.splendor-mobile-mini-bonus.is-green {
+  background: #4d9860;
+  color: #fff;
+}
+
+.splendor-mobile-bonus.is-red,
+.splendor-mobile-mini-bonus.is-red {
+  background: #be514c;
+  color: #fff;
+}
+
+.splendor-mobile-bonus.is-black,
+.splendor-mobile-mini-bonus.is-black {
+  background: #303743;
+  color: #fff;
+}
+
+.splendor-mobile-cost {
+  display: flex;
+  align-items: center;
+  align-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+
+.splendor-mobile-cost-token {
+  border-radius: 3px;
+  background: #eef1f4;
+  padding: 1px 2px;
+  color: #516173;
+  font-size: 8px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.splendor-mobile-cost-token.is-blue {
+  background: #e2eefc;
+  color: #315c91;
+}
+.splendor-mobile-cost-token.is-green {
+  background: #e5f3e8;
+  color: #347246;
+}
+.splendor-mobile-cost-token.is-red {
+  background: #fbe8e7;
+  color: #96413d;
+}
+.splendor-mobile-cost-token.is-black {
+  background: #e7e9ed;
+  color: #303743;
+}
+
+.splendor-mobile-section-label {
+  color: #627287;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.splendor-mobile-nobles {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.splendor-mobile-noble-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.splendor-mobile-noble {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  border: 1px solid #b38a3b;
+  border-radius: 5px;
   background: #fff1cc;
   color: #533a16;
+  grid-template-rows: 20px auto;
+  padding: 2px;
+  text-align: left;
 }
 
-/* The desktop layout used to be a direct child of the shell; keep its spacing
-   after the mobile/desktop switch wrapper was introduced. */
-.splendor-desktop > .splendor-layout {
-  margin-top: 18px;
+.splendor-mobile-noble-art {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
 }
 
-@media (max-width: 620px) {
-  .splendor-desktop {
-    display: none;
-  }
+.splendor-mobile-noble:disabled {
+  cursor: default;
+}
 
-  .splendor-mobile,
-  .splendor-mobile-lobby {
-    display: grid;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    gap: 4px;
-    box-sizing: border-box;
-    color: #203044;
-    font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  }
+.splendor-mobile-noble.is-eligible {
+  border-color: #956717;
+  background: #ffe1a0;
+  box-shadow: inset 0 0 0 1px #956717;
+  color: #533a16;
+  cursor: pointer;
+}
 
+.splendor-mobile-noble > strong {
+  grid-area: 1 / 1;
+  z-index: 1;
+  font-size: 9px;
+}
+
+.splendor-mobile-noble .splendor-mobile-cost-token {
+  font-size: 7px;
+}
+
+.splendor-mobile-noble-action {
+  color: #6e4606;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.splendor-mobile-self {
+  display: grid;
+  grid-template-rows: 12px 22px minmax(16px, auto);
+  min-width: 0;
+  border: 1px solid #e5dbc7;
+  border-radius: 7px;
+  background: #fffdf6;
+  padding: 3px 5px;
+}
+
+.splendor-mobile-self-heading,
+.splendor-mobile-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  font-size: 9px;
+}
+
+.splendor-mobile-self-heading span {
+  color: #7d6c4b;
+  font-size: 8px;
+}
+
+.splendor-mobile-gems {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.splendor-mobile-gem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  height: 20px;
+  border: 1px solid #dfe6ef;
+  border-radius: 5px;
+  background: #fffdf8;
+  color: #5b6879;
+  padding: 1px 3px;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.splendor-mobile-gem strong {
+  color: #1f3651;
+  font-size: 10px;
+}
+
+.splendor-mobile-gem::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  transform: rotate(45deg) skew(-7deg, -7deg);
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.splendor-mobile-gem.is-white::before {
+  background: #e9eef2;
+  border: 1px solid #a7b4c0;
+}
+.splendor-mobile-gem.is-blue::before {
+  background: #4c8bd5;
+}
+.splendor-mobile-gem.is-green::before {
+  background: #58a96a;
+}
+.splendor-mobile-gem.is-red::before {
+  background: #d75c57;
+}
+.splendor-mobile-gem.is-black::before {
+  background: #3e4652;
+}
+.splendor-mobile-gem.is-gold::before {
+  background: #e8b638;
+}
+
+.splendor-mobile-gem.is-white {
+  border-color: #bbc6d0;
+}
+.splendor-mobile-gem.is-blue {
+  border-color: #9ab9dd;
+}
+.splendor-mobile-gem.is-green {
+  border-color: #a2caaa;
+}
+.splendor-mobile-gem.is-red {
+  border-color: #dfa09c;
+}
+.splendor-mobile-gem.is-black {
+  border-color: #7b8490;
+}
+.splendor-mobile-gem.is-gold {
+  border-color: #d7b05d;
+}
+
+.splendor-mobile-gem.is-selected {
+  border-color: #a87518;
+  background: #fff3d2;
+  box-shadow: 0 0 0 1px #edc86b inset;
+}
+
+.splendor-mobile-gem.is-blocked {
+  cursor: help;
+  opacity: 0.7;
+}
+
+.splendor-mobile-gem:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.splendor-mobile-bonus-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.splendor-mobile-bonus-title {
+  flex: 0 0 auto;
+  color: #7d6c4b;
+  font-size: 8px;
+}
+
+.splendor-mobile-mini-bonus {
+  flex: 0 0 auto;
+  min-width: 19px;
+  height: 13px;
+  padding: 0 2px;
+  font-size: 8px;
+}
+
+.splendor-mobile-reserved-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.splendor-mobile-reserved {
+  min-width: 0;
+  min-height: 24px;
+  border: 1px solid #d0b57b;
+  border-radius: 4px;
+  background: #fff6df;
+  color: #795618;
+  padding: 0 3px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.splendor-mobile-reserved.is-selected {
+  box-shadow: 0 0 0 1px #b67b1e inset;
+}
+
+.splendor-mobile-action-panel,
+.splendor-mobile-supply {
+  min-width: 0;
+  border-radius: 7px;
+  background: #f7f9fc;
+  padding: 3px 5px;
+}
+
+.splendor-mobile-action-panel {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 48px;
+  border: 1px solid #dfe6ef;
+}
+
+.splendor-mobile-action-panel.is-pending {
+  background: #fff8e8;
+  border-color: #e8ce94;
+}
+
+.splendor-mobile-selection,
+.splendor-mobile-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+  color: #5f6e80;
+  font-size: 9px;
+}
+
+.splendor-mobile-selection > strong,
+.splendor-mobile-action-heading {
+  color: #2b435d;
+}
+
+.splendor-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.splendor-mobile-actions button {
+  flex: 0 1 auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 5px;
+  background: #204d83;
+  color: #fff;
+  padding: 4px 7px;
+  font-size: 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.splendor-mobile-actions button.is-secondary {
+  background: #e9eef4;
+  color: #29435e;
+}
+
+.splendor-mobile-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.splendor-mobile-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.splendor-mobile-card-actions button {
+  min-height: 32px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.splendor-mobile-card-actions .splendor-mobile-buy {
+  background: #17634e;
+}
+
+.splendor-mobile-card-actions .splendor-mobile-reserve {
+  border-color: #9b6014;
+  background: #ffebbd;
+  color: #663c07;
+}
+
+.splendor-mobile-card-actions button:disabled {
+  opacity: 1;
+  border-color: #bfc9c8;
+  background: #edf1f1;
+  color: #526460;
+}
+
+.splendor-mobile-supply {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 5px;
+  border: 1px solid #dfe6ef;
+}
+
+.splendor-mobile-overlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #17233566;
+  padding: 16px;
+}
+
+.splendor-mobile-dialog {
+  width: min(340px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border: 1px solid #dfe6ef;
+  border-radius: 12px;
+  background: #fffdf8;
+  box-shadow: 0 16px 40px #17233533;
+  padding: 12px;
+}
+
+.splendor-mobile-dialog-heading strong {
+  font-size: 14px;
+}
+
+.splendor-mobile-dialog-heading button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef3f8;
+  color: #3b4c60;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.splendor-mobile-dialog-score {
+  margin: 8px 0;
+  color: #5d6c7e;
+  font-size: 11px;
+}
+
+.splendor-mobile-dialog-row,
+.splendor-mobile-bonus-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.splendor-mobile-dialog-row {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 8px;
+  color: #687688;
+  font-size: 10px;
+}
+
+.splendor-mobile-lobby {
+  gap: 8px;
+  min-height: min(480px, calc(100dvh - 88px));
+  align-content: start;
+  padding-top: 2px;
+  background:
+    radial-gradient(circle at 10% 20%, #ffe8a3 0 8%, transparent 8.5%),
+    linear-gradient(145deg, #fff0b7, #fffdf7 65%);
+  border-radius: 12px;
+}
+
+.splendor-mobile-lobby-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #edc66b;
+  border-radius: 12px;
+  background: #fffdf8e8;
+  padding: 12px;
+}
+
+.splendor-mobile-lobby-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #974c13;
+  font-size: 13px;
+}
+
+.splendor-mobile-lobby-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #f6b72b;
+  color: #fff8d6;
+  box-shadow: 0 2px 3px #bd751633;
+}
+
+.splendor-mobile-lobby-heading span,
+.splendor-mobile-lobby-players {
+  color: #657589;
+  font-size: 11px;
+}
+
+.splendor-mobile-lobby-players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.splendor-mobile-lobby-players > span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 30px;
+  overflow: hidden;
+  border: 1px solid #e6d8b3;
+  border-radius: 7px;
+  background: #fff;
+  padding: 3px 5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-mobile-lobby-players > span.is-occupied {
+  color: #80501f;
+}
+.splendor-mobile-lobby-players > span.is-empty {
+  color: #9a9c9d;
+  background: #fafafa;
+}
+
+.splendor-mobile-lobby-players b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-mobile-seat-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #ffe8a9;
+  color: #bd7715;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.splendor-mobile-lobby .splendor-mobile-actions button {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+
+.splendor-mobile-lobby .splendor-mobile-actions button:first-child {
+  background: #ef8d20;
+  box-shadow: 0 2px 0 #bd6217;
+}
+
+.splendor-mobile-lobby .tabletop-card.avalon-timer {
+  margin: 0;
+  padding: 10px;
+}
+
+.splendor-mobile-lobby .avalon-timer h2 {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.splendor-mobile-lobby .avalon-timer form {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+
+.splendor-mobile-lobby .avalon-timer label {
+  margin: 0;
+  font-size: 10px;
+}
+
+.splendor-mobile-lobby .avalon-timer input {
+  width: 4rem;
+  padding: 4px;
+}
+
+.splendor-mobile-lobby .avalon-timer .tabletop-actions button {
+  width: auto;
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+@media (min-width: 351px) and (min-height: 690px) {
   .splendor-mobile {
-    grid-template-rows: 24px 38px minmax(164px, auto) repeat(4, auto);
-    padding: 2px 0 0;
-    background:
-      radial-gradient(circle at 90% 4%, #ffe8a8 0 7%, transparent 7.5%),
-      linear-gradient(145deg, #fff3c9 0%, #fffaf1 26%, #fff 82%);
-    border-radius: 10px;
-  }
-
-  .splendor-mobile button {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .splendor-mobile-status {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    font-size: 10px;
-  }
-
-  .splendor-mobile-status > span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border-radius: 999px;
-    background: #eef3f8;
-    padding: 3px 7px;
-  }
-
-  .splendor-mobile-status > .is-live {
-    background: #e3f6ed;
-    color: #0d7044;
-  }
-
-  .splendor-mobile-status > .is-warn {
-    background: #fff0d2;
-    color: #855800;
-  }
-
-  .splendor-mobile-turn-clock {
-    margin-inline-start: auto;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .splendor-mobile-clock {
-    display: inline-block;
-    min-width: 34px;
-    color: #25415d;
-    font-weight: 800;
-    text-align: center;
-  }
-
-  .splendor-mobile-clock.is-danger {
-    color: #af3c36;
-  }
-
-  .splendor-mobile-players {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-players button {
-    position: relative;
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr);
-    column-gap: 3px;
-    min-width: 0;
-    align-content: center;
-    overflow: hidden;
-    border: 1px solid #e1c982;
-    border-radius: 7px;
-    background: #fffdf6;
-    color: #4d6178;
-    padding: 2px 4px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-players button.is-current {
-    border-color: #df8d22;
-    box-shadow: 0 0 0 2px #ffe0a5 inset;
-  }
-
-  .splendor-mobile-players button.is-you {
-    background: #fff3d1;
-  }
-
-  .splendor-mobile-player-icon {
-    display: grid;
-    grid-row: span 2;
-    align-self: center;
-    place-items: center;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: linear-gradient(145deg, #f8c74d, #dd7d1a);
-    color: #fff9e2;
-    font-size: 8px;
-    box-shadow: 0 1px 2px #a85f1b55;
+    grid-template-rows:
+      28px 46px minmax(222px, auto) minmax(54px, auto)
+      repeat(3, auto);
   }
 
   .splendor-mobile-players strong,
-  .splendor-mobile-players span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-players strong {
-    color: #1f3651;
-    font-size: 10px;
-  }
-
-  .splendor-mobile-players span {
-    font-size: 9px;
-  }
-
-  .splendor-mobile-players em {
-    position: absolute;
-    right: 2px;
-    bottom: 1px;
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 9px;
-    font-style: normal;
-    line-height: 1;
-  }
-
-  .splendor-mobile-market {
-    display: grid;
-    min-width: 0;
-    gap: 3px;
-  }
-
-  .splendor-mobile-market-row {
-    display: grid;
-    grid-template-columns: 30px repeat(4, minmax(0, 1fr));
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-tier-label {
-    display: grid;
-    grid-template-rows: 17px 12px 1fr;
-    align-items: center;
-    justify-items: center;
-    min-width: 0;
-    border-radius: 7px;
-    background: #f2e3c8;
-    color: #6e4d20;
-    padding: 2px;
-  }
-
-  .splendor-mobile-tier-label.is-level-2 {
-    background: #e2edf8;
-    color: #3f6389;
-  }
-
-  .splendor-mobile-tier-label.is-level-3 {
-    background: #eee8fa;
-    color: #65548b;
-  }
-
-  .splendor-mobile-tier-label strong {
-    font-size: 11px;
-  }
-
-  .splendor-mobile-tier-label small {
-    font-size: 8px;
-  }
-
-  .splendor-mobile-tier-label button {
-    min-width: 0;
-    border: 0;
-    border-radius: 4px;
-    background: #ffffffa8;
-    color: inherit;
-    padding: 1px 2px;
-    font-size: 8px;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-tier-label button:disabled {
-    cursor: not-allowed;
-    opacity: 0.42;
-  }
-
-  .splendor-mobile-market-card {
-    display: grid;
-    min-width: 0;
-    min-height: 0;
-    grid-template-rows: 32px auto;
-    align-content: center;
-    border: 1px solid #d7b276;
-    border-radius: 7px;
-    background: #fffdf7;
-    color: #27374c;
-    padding: 3px 4px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-market-card.is-level-2 {
-    border-color: #89a7c8;
-    background: #f8fbff;
-  }
-
-  .splendor-mobile-market-card.is-level-3 {
-    border-color: #9a8bc2;
-    background: #fbf8ff;
-  }
-
-  .splendor-mobile-market-card.is-selected {
-    border-color: #a87518;
-    box-shadow: 0 0 0 2px #f0d29b inset;
-  }
-
   .splendor-mobile-card-top {
-    grid-area: 1 / 1;
-    z-index: 1;
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: 2px;
-    min-width: 0;
-    font-size: 10px;
-  }
-
-  .splendor-mobile-card-top strong {
-    color: #8c5b13;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-card-art,
-  .splendor-mobile-noble-art {
-    min-width: 0;
-    grid-area: 1 / 1;
-    justify-self: center;
-    width: 32px;
-    height: 32px;
-    box-shadow: inset 0 0 0 1px #ffffff66;
-  }
-
-  .splendor-mobile-market-card.is-level-2 .splendor-mobile-card-art {
-    filter: saturate(0.92) hue-rotate(7deg);
-  }
-
-  .splendor-mobile-market-card.is-level-3 .splendor-mobile-card-art {
-    filter: saturate(0.94) hue-rotate(-9deg);
-  }
-
-  .splendor-mobile-bonus,
-  .splendor-mobile-mini-bonus {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    font-weight: 800;
-  }
-
-  .splendor-mobile-bonus {
-    width: 14px;
-    height: 14px;
-    color: #fff;
-    font-size: 8px;
-  }
-
-  .splendor-mobile-bonus.is-white,
-  .splendor-mobile-mini-bonus.is-white {
-    background: #b8c3ce;
-    color: #243142;
-  }
-
-  .splendor-mobile-bonus.is-blue,
-  .splendor-mobile-mini-bonus.is-blue {
-    background: #3e75ba;
-    color: #fff;
-  }
-
-  .splendor-mobile-bonus.is-green,
-  .splendor-mobile-mini-bonus.is-green {
-    background: #4d9860;
-    color: #fff;
-  }
-
-  .splendor-mobile-bonus.is-red,
-  .splendor-mobile-mini-bonus.is-red {
-    background: #be514c;
-    color: #fff;
-  }
-
-  .splendor-mobile-bonus.is-black,
-  .splendor-mobile-mini-bonus.is-black {
-    background: #303743;
-    color: #fff;
-  }
-
-  .splendor-mobile-cost {
-    display: flex;
-    align-items: center;
-    align-content: center;
-    flex-wrap: wrap;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-cost-token {
-    border-radius: 3px;
-    background: #eef1f4;
-    padding: 1px 2px;
-    color: #516173;
-    font-size: 8px;
-    line-height: 1.1;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-cost-token.is-blue {
-    background: #e2eefc;
-    color: #315c91;
-  }
-  .splendor-mobile-cost-token.is-green {
-    background: #e5f3e8;
-    color: #347246;
-  }
-  .splendor-mobile-cost-token.is-red {
-    background: #fbe8e7;
-    color: #96413d;
-  }
-  .splendor-mobile-cost-token.is-black {
-    background: #e7e9ed;
-    color: #303743;
-  }
-
-  .splendor-mobile-section-label {
-    color: #627287;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 12px;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-nobles {
-    display: grid;
-    grid-template-columns: 26px minmax(0, 1fr);
-    gap: 4px;
-    min-width: 0;
-    align-items: stretch;
-  }
-
-  .splendor-mobile-noble-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-noble {
-    display: grid;
-    min-width: 0;
-    align-content: center;
-    border: 1px solid #b38a3b;
-    border-radius: 5px;
-    background: #fff1cc;
-    color: #533a16;
-    grid-template-rows: 20px auto;
-    padding: 2px;
-    text-align: left;
-  }
-
-  .splendor-mobile-noble-art {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-  }
-
-  .splendor-mobile-noble:disabled {
-    cursor: default;
-  }
-
-  .splendor-mobile-noble.is-eligible {
-    border-color: #956717;
-    background: #ffe1a0;
-    box-shadow: inset 0 0 0 1px #956717;
-    color: #533a16;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-noble > strong {
-    grid-area: 1 / 1;
-    z-index: 1;
-    font-size: 9px;
-  }
-
-  .splendor-mobile-noble .splendor-mobile-cost-token {
-    font-size: 7px;
-  }
-
-  .splendor-mobile-noble-action {
-    color: #6e4606;
-    font-size: 7px;
-    font-weight: 800;
-  }
-
-  .splendor-mobile-self {
-    display: grid;
-    grid-template-rows: 12px 22px minmax(16px, auto);
-    min-width: 0;
-    border: 1px solid #e5dbc7;
-    border-radius: 7px;
-    background: #fffdf6;
-    padding: 3px 5px;
-  }
-
-  .splendor-mobile-self-heading,
-  .splendor-mobile-dialog-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    min-width: 0;
-    font-size: 9px;
-  }
-
-  .splendor-mobile-self-heading span {
-    color: #7d6c4b;
-    font-size: 8px;
-  }
-
-  .splendor-mobile-gems {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-gem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-width: 0;
-    height: 20px;
-    border: 1px solid #dfe6ef;
-    border-radius: 5px;
-    background: #fffdf8;
-    color: #5b6879;
-    padding: 1px 3px;
-    font-size: 8px;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-gem strong {
-    color: #1f3651;
-    font-size: 10px;
-  }
-
-  .splendor-mobile-gem::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    flex: 0 0 auto;
-    transform: rotate(45deg) skew(-7deg, -7deg);
-    border-radius: 2px;
-    background: currentColor;
-    opacity: 0.7;
-  }
-
-  .splendor-mobile-gem.is-white::before {
-    background: #e9eef2;
-    border: 1px solid #a7b4c0;
-  }
-  .splendor-mobile-gem.is-blue::before {
-    background: #4c8bd5;
-  }
-  .splendor-mobile-gem.is-green::before {
-    background: #58a96a;
-  }
-  .splendor-mobile-gem.is-red::before {
-    background: #d75c57;
-  }
-  .splendor-mobile-gem.is-black::before {
-    background: #3e4652;
-  }
-  .splendor-mobile-gem.is-gold::before {
-    background: #e8b638;
-  }
-
-  .splendor-mobile-gem.is-white {
-    border-color: #bbc6d0;
-  }
-  .splendor-mobile-gem.is-blue {
-    border-color: #9ab9dd;
-  }
-  .splendor-mobile-gem.is-green {
-    border-color: #a2caaa;
-  }
-  .splendor-mobile-gem.is-red {
-    border-color: #dfa09c;
-  }
-  .splendor-mobile-gem.is-black {
-    border-color: #7b8490;
-  }
-  .splendor-mobile-gem.is-gold {
-    border-color: #d7b05d;
-  }
-
-  .splendor-mobile-gem.is-selected {
-    border-color: #a87518;
-    background: #fff3d2;
-    box-shadow: 0 0 0 1px #edc86b inset;
-  }
-
-  .splendor-mobile-gem:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .splendor-mobile-bonus-row {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-
-  .splendor-mobile-bonus-title {
-    flex: 0 0 auto;
-    color: #7d6c4b;
-    font-size: 8px;
-  }
-
-  .splendor-mobile-mini-bonus {
-    flex: 0 0 auto;
-    min-width: 19px;
-    height: 13px;
-    padding: 0 2px;
-    font-size: 8px;
-  }
-
-  .splendor-mobile-reserved-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    margin-top: 3px;
-  }
-
-  .splendor-mobile-reserved {
-    min-width: 0;
-    min-height: 24px;
-    border: 1px solid #d0b57b;
-    border-radius: 4px;
-    background: #fff6df;
-    color: #795618;
-    padding: 0 3px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-reserved.is-selected {
-    box-shadow: 0 0 0 1px #b67b1e inset;
-  }
-
-  .splendor-mobile-action-panel,
-  .splendor-mobile-supply {
-    min-width: 0;
-    border-radius: 7px;
-    background: #f7f9fc;
-    padding: 3px 5px;
-  }
-
-  .splendor-mobile-action-panel {
-    display: grid;
-    align-content: center;
-    gap: 3px;
-    min-height: 48px;
-    border: 1px solid #dfe6ef;
-  }
-
-  .splendor-mobile-action-panel.is-pending {
-    background: #fff8e8;
-    border-color: #e8ce94;
-  }
-
-  .splendor-mobile-selection,
-  .splendor-mobile-action-heading {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    flex-wrap: wrap;
-    color: #5f6e80;
-    font-size: 9px;
-  }
-
-  .splendor-mobile-selection > strong,
-  .splendor-mobile-action-heading {
-    color: #2b435d;
-  }
-
-  .splendor-mobile-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-actions button {
-    flex: 0 1 auto;
-    min-width: 0;
-    border: 0;
-    border-radius: 5px;
-    background: #204d83;
-    color: #fff;
-    padding: 4px 7px;
-    font-size: 9px;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .splendor-mobile-actions button.is-secondary {
-    background: #e9eef4;
-    color: #29435e;
-  }
-
-  .splendor-mobile-actions button:disabled {
-    cursor: not-allowed;
-    opacity: 0.42;
-  }
-
-  .splendor-mobile-card-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .splendor-mobile-card-actions button {
-    min-height: 32px;
-    border: 1px solid transparent;
-    font-size: 14px;
-    font-weight: 750;
-  }
-
-  .splendor-mobile-card-actions .splendor-mobile-buy {
-    background: #17634e;
-  }
-
-  .splendor-mobile-card-actions .splendor-mobile-reserve {
-    border-color: #9b6014;
-    background: #ffebbd;
-    color: #663c07;
-  }
-
-  .splendor-mobile-card-actions button:disabled {
-    opacity: 1;
-    border-color: #bfc9c8;
-    background: #edf1f1;
-    color: #526460;
-  }
-
-  .splendor-mobile-supply {
-    display: grid;
-    grid-template-rows: 12px 22px;
-    gap: 2px;
-    border: 1px solid #dfe6ef;
-  }
-
-  .splendor-mobile-overlay {
-    position: fixed;
-    z-index: 80;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    background: #17233566;
-    padding: 16px;
-  }
-
-  .splendor-mobile-dialog {
-    width: min(340px, 100%);
-    max-height: calc(100dvh - 32px);
-    overflow-y: auto;
-    border: 1px solid #dfe6ef;
-    border-radius: 12px;
-    background: #fffdf8;
-    box-shadow: 0 16px 40px #17233533;
-    padding: 12px;
-  }
-
-  .splendor-mobile-dialog-heading strong {
-    font-size: 14px;
-  }
-
-  .splendor-mobile-dialog-heading button {
-    width: 26px;
-    height: 26px;
-    border: 0;
-    border-radius: 50%;
-    background: #eef3f8;
-    color: #3b4c60;
-    font-size: 18px;
-    line-height: 1;
-  }
-
-  .splendor-mobile-dialog-score {
-    margin: 8px 0;
-    color: #5d6c7e;
-    font-size: 11px;
-  }
-
-  .splendor-mobile-dialog-row,
-  .splendor-mobile-bonus-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .splendor-mobile-dialog-row {
-    display: grid;
-    gap: 5px;
-    margin-bottom: 8px;
-    color: #687688;
-    font-size: 10px;
-  }
-
-  .splendor-mobile-lobby {
-    gap: 8px;
-    min-height: min(480px, calc(100dvh - 88px));
-    align-content: start;
-    padding-top: 2px;
-    background:
-      radial-gradient(circle at 10% 20%, #ffe8a3 0 8%, transparent 8.5%),
-      linear-gradient(145deg, #fff0b7, #fffdf7 65%);
-    border-radius: 12px;
-  }
-
-  .splendor-mobile-lobby-card {
-    display: grid;
-    gap: 10px;
-    border: 1px solid #edc66b;
-    border-radius: 12px;
-    background: #fffdf8e8;
-    padding: 12px;
-  }
-
-  .splendor-mobile-lobby-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    color: #974c13;
-    font-size: 13px;
-  }
-
-  .splendor-mobile-lobby-mark {
-    display: inline-grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    margin-right: 4px;
-    border-radius: 50%;
-    background: #f6b72b;
-    color: #fff8d6;
-    box-shadow: 0 2px 3px #bd751633;
-  }
-
-  .splendor-mobile-lobby-heading span,
-  .splendor-mobile-lobby-players {
-    color: #657589;
-    font-size: 11px;
-  }
-
-  .splendor-mobile-lobby-players {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
-  }
-
-  .splendor-mobile-lobby-players > span {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    min-height: 30px;
-    overflow: hidden;
-    border: 1px solid #e6d8b3;
-    border-radius: 7px;
-    background: #fff;
-    padding: 3px 5px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-lobby-players > span.is-occupied {
-    color: #80501f;
-  }
-  .splendor-mobile-lobby-players > span.is-empty {
-    color: #9a9c9d;
-    background: #fafafa;
-  }
-
-  .splendor-mobile-lobby-players b {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .splendor-mobile-seat-icon {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    flex: 0 0 auto;
-    margin-right: 4px;
-    border-radius: 50%;
-    background: #ffe8a9;
-    color: #bd7715;
-    font-style: normal;
     font-size: 12px;
   }
 
-  .splendor-mobile-lobby .splendor-mobile-actions button {
-    min-height: 36px;
-    padding-inline: 10px;
-  }
-
-  .splendor-mobile-lobby .splendor-mobile-actions button:first-child {
-    background: #ef8d20;
-    box-shadow: 0 2px 0 #bd6217;
-  }
-
-  .splendor-mobile-lobby .tabletop-card.avalon-timer {
-    margin: 0;
-    padding: 10px;
-  }
-
-  .splendor-mobile-lobby .avalon-timer h2 {
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-
-  .splendor-mobile-lobby .avalon-timer form {
-    display: flex;
-    align-items: end;
-    gap: 6px;
-  }
-
-  .splendor-mobile-lobby .avalon-timer label {
-    margin: 0;
+  .splendor-mobile-cost-token {
     font-size: 10px;
   }
 
-  .splendor-mobile-lobby .avalon-timer input {
-    width: 4rem;
-    padding: 4px;
-  }
-
-  .splendor-mobile-lobby .avalon-timer .tabletop-actions button {
-    width: auto;
-    padding: 5px 7px;
-    font-size: 10px;
-  }
-
-  @media (min-width: 351px) and (min-height: 690px) {
-    .splendor-mobile {
-      grid-template-rows:
-        28px 46px minmax(222px, auto) minmax(54px, auto)
-        repeat(3, auto);
-    }
-
-    .splendor-mobile-players strong,
-    .splendor-mobile-card-top {
-      font-size: 12px;
-    }
-
-    .splendor-mobile-cost-token {
-      font-size: 10px;
-    }
-
-    .splendor-mobile-actions button {
-      min-height: 30px;
-    }
-  }
-
-  @media (max-width: 350px) {
-    .splendor-mobile {
-      grid-template-rows: 23px 36px minmax(158px, auto) repeat(4, auto);
-    }
-
-    .splendor-mobile
-      .splendor-mobile-actions:not(.splendor-mobile-card-actions)
-      button {
-      padding-inline: 5px;
-      font-size: 8px;
-    }
-
-    .splendor-mobile-market-row {
-      grid-template-columns: 27px repeat(4, minmax(0, 1fr));
-    }
-
-    .splendor-mobile-tier-label button {
-      font-size: 7px;
-    }
-
-    .splendor-mobile-cost-token {
-      font-size: 7px;
-    }
-  }
-
-  @media (max-height: 650px) {
-    .splendor-mobile {
-      gap: 3px;
-    }
-
-    .splendor-mobile-market-card {
-      grid-template-rows: 25px auto;
-      padding-block: 2px;
-    }
-
-    .splendor-mobile-card-art {
-      width: 25px;
-      height: 25px;
-    }
-
-    .splendor-mobile-self {
-      grid-template-rows: 12px 20px minmax(14px, auto);
-      padding-block: 2px;
-    }
+  .splendor-mobile-actions button {
+    min-height: 30px;
   }
 }
 
-@media (min-width: 621px) {
-  .splendor-mobile,
-  .splendor-mobile-lobby {
-    display: none;
+@media (max-width: 350px) {
+  .splendor-mobile {
+    grid-template-rows: 23px 36px minmax(158px, auto) repeat(4, auto);
   }
+
+  .splendor-mobile
+    .splendor-mobile-actions:not(.splendor-mobile-card-actions)
+    button {
+    padding-inline: 5px;
+    font-size: 8px;
+  }
+
+  .splendor-mobile-market-row {
+    grid-template-columns: 27px repeat(4, minmax(0, 1fr));
+  }
+
+  .splendor-mobile-tier-label button {
+    font-size: 7px;
+  }
+
+  .splendor-mobile-cost-token {
+    font-size: 7px;
+  }
+}
+
+@media (max-height: 650px) {
+  .splendor-mobile {
+    gap: 3px;
+  }
+
+  .splendor-mobile-market-card {
+    grid-template-rows: 25px auto;
+    padding-block: 2px;
+  }
+
+  .splendor-mobile-card-art {
+    width: 25px;
+    height: 25px;
+  }
+
+  .splendor-mobile-self {
+    grid-template-rows: 12px 20px minmax(14px, auto);
+    padding-block: 2px;
+  }
+}
+
+/* Desktop uses the same compact table markup as mobile. The desktop-specific
+   rules below scale the grid and keep the board centered without duplicating
+   the interaction model. */
+
+/* Keep the mobile table in the same reading order as the reference game:
+   opponents, nobles, gem bank, market (III to I), then the player's area. */
+.splendor-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 0;
+}
+
+.splendor-mobile > .splendor-mobile-status {
+  order: 1;
+}
+.splendor-mobile > .splendor-mobile-victory {
+  order: 2;
+}
+.splendor-mobile > .splendor-mobile-players {
+  order: 3;
+}
+.splendor-mobile > .splendor-mobile-nobles {
+  order: 4;
+}
+.splendor-mobile > .splendor-mobile-supply {
+  order: 5;
+}
+.splendor-mobile > .splendor-mobile-market {
+  order: 6;
+}
+.splendor-mobile > .splendor-mobile-self {
+  order: 8;
+}
+.splendor-mobile > .splendor-mobile-action-panel {
+  order: 7;
+}
+
+.splendor-mobile-market {
+  gap: 6px;
+}
+
+.splendor-mobile-market-card {
+  grid-template-rows: 30px auto auto;
+  min-height: 63px;
+}
+
+.splendor-mobile-payment {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  grid-column: 1;
+  color: #a52a2a;
+  font-size: 7px;
+  line-height: 1;
+}
+
+.splendor-mobile-payment small {
+  flex: 0 0 auto;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.splendor-mobile-payment .splendor-mobile-cost {
+  flex-wrap: wrap;
+}
+
+.splendor-mobile-payment .splendor-mobile-cost-token {
+  padding: 1px;
+  font-size: 7px;
+}
+
+.splendor-mobile-supply {
+  padding-block: 7px;
+  margin-block-end: 8px;
+  background: #fff9df;
+  border-color: #e6c96b;
+}
+
+.splendor-mobile-supply .splendor-mobile-gem {
+  height: 26px;
+  border-width: 2px;
+  font-size: 9px;
+}
+
+.splendor-mobile-supply .splendor-mobile-gem strong {
+  font-size: 13px;
+}
+
+.splendor-mobile-self-heading span.is-over {
+  color: #b32121;
+  font-weight: 800;
+}
+
+.splendor-mobile-reserved {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: 20px auto;
+  align-items: center;
+  gap: 1px 3px;
+  min-height: 34px;
+  padding: 2px;
+  overflow: hidden;
+  text-align: left;
+}
+
+.splendor-mobile-reserved-art {
+  grid-row: 1 / 3;
+  width: 22px;
+  height: 28px;
+  border-radius: 3px;
+}
+
+.splendor-mobile-reserved .splendor-mobile-cost {
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.splendor-mobile-reserved .splendor-mobile-cost-token {
+  padding: 1px;
+  font-size: 7px;
+}
+
+.splendor-mobile-reserved.is-empty {
+  display: grid;
+  place-items: center;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  color: #b7a98c;
+  border-style: dashed;
+  background: #fffaf0;
+  text-align: center;
+}
+
+.splendor-mobile-reserved.is-empty i {
+  font-size: 16px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.splendor-mobile-reserved.is-empty small {
+  font-size: 7px;
+}
+
+.splendor-mobile-victory {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #d8a52f;
+  border-radius: 9px;
+  background: linear-gradient(100deg, #fff0ad, #fffaf0);
+  color: #704708;
+  padding: 5px 8px;
+  box-shadow: 0 2px 8px #d69d3438;
+}
+
+.splendor-mobile-victory-icon {
+  flex: 0 0 auto;
+  font-size: 23px;
+  filter: drop-shadow(0 1px 1px #a66f2c55);
+}
+
+.splendor-mobile-victory div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.splendor-mobile-victory strong,
+.splendor-mobile-victory span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-mobile-victory strong {
+  color: #86520a;
+  font-size: 12px;
+}
+
+.splendor-mobile-victory div span {
+  font-size: 9px;
+}
+
+.splendor-mobile-selection-toast {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: 72px;
+  max-width: min(320px, calc(100vw - 28px));
+  transform: translateX(-50%);
+  border: 1px solid #8d5e1c;
+  border-radius: 999px;
+  background: #3b2b1dcc;
+  color: #fff8df;
+  padding: 7px 12px;
+  box-shadow: 0 8px 20px #1b273844;
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.splendor-mobile-players button {
+  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
+  min-height: 58px;
+}
+
+.splendor-mobile-players button .splendor-player-chip-strip,
+.splendor-mobile-players button .splendor-player-bonus-row,
+.splendor-mobile-players button .splendor-player-last-purchase {
+  grid-column: 1 / -1;
+}
+
+.splendor-player-chip-strip {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.splendor-player-chip-strip i,
+.splendor-player-mini-bonus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: #eef1f4;
+  color: #516173;
+  padding: 0 2px;
+  font-size: 7px;
+  font-style: normal;
+  line-height: 12px;
+}
+
+.splendor-player-chip-strip i.is-blue,
+.splendor-player-mini-bonus.is-blue {
+  background: #e2eefc;
+  color: #315c91;
+}
+.splendor-player-chip-strip i.is-green,
+.splendor-player-mini-bonus.is-green {
+  background: #e5f3e8;
+  color: #347246;
+}
+.splendor-player-chip-strip i.is-red,
+.splendor-player-mini-bonus.is-red {
+  background: #fbe8e7;
+  color: #96413d;
+}
+.splendor-player-chip-strip i.is-black,
+.splendor-player-mini-bonus.is-black {
+  background: #e7e9ed;
+  color: #303743;
+}
+.splendor-player-chip-strip i.is-gold,
+.splendor-player-mini-bonus.is-gold {
+  background: #fff0be;
+  color: #8e6415;
+}
+
+.splendor-mobile-players .splendor-player-bonus-row {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  min-height: 12px;
+  overflow: hidden;
+}
+
+.splendor-player-last-purchase {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  color: #89621c;
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.splendor-player-last-purchase .splendor-card-portrait {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+}
+
+.splendor-player-last-purchase > i:last-child {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  font-style: normal;
+  text-overflow: ellipsis;
+}
+
+.splendor-player-last-purchase .splendor-mobile-cost {
+  flex-wrap: wrap;
+}
+
+.splendor-player-last-purchase .splendor-mobile-cost-token {
+  padding: 0 1px;
+  font-size: 6px;
+}
+
+.splendor-card-payment {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  color: #a52a2a;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.splendor-card-payment > .splendor-card-cost {
+  min-width: 0;
+  margin: 0;
+}
+
+.splendor-card-payment.is-compact {
+  display: inline-flex;
+  font-size: 0.65rem;
 }
 
 .splendor-board .splendor-card.is-affordable,
@@ -1025,4 +1484,287 @@
   .splendor-board .is-affordable::after {
     animation: none;
   }
+}
+
+@media (max-width: 620px) and (max-height: 650px) {
+  .splendor-mobile {
+    gap: 3px;
+  }
+
+  .splendor-mobile-players button {
+    min-height: 48px;
+  }
+
+  .splendor-mobile-market-card {
+    grid-template-rows: 24px auto auto;
+    min-height: 51px;
+    padding-block: 2px;
+  }
+
+  .splendor-mobile-action-panel:not(.is-pending) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  .splendor-mobile-selection {
+    grid-column: 1 / -1;
+  }
+
+  .splendor-mobile-card-actions button {
+    min-height: 27px;
+    font-size: 12px;
+  }
+}
+
+.splendor-mobile > .splendor-purchase-notice {
+  order: 4;
+}
+
+.splendor-mobile > .splendor-mobile-nobles {
+  order: 5;
+}
+
+.splendor-mobile > .splendor-mobile-supply {
+  order: 6;
+}
+
+.splendor-mobile > .splendor-mobile-market {
+  order: 7;
+}
+
+.splendor-mobile > .splendor-mobile-action-panel {
+  order: 8;
+}
+
+.splendor-mobile > .splendor-mobile-self {
+  order: 9;
+}
+
+.splendor-mobile > .splendor-purchase-notice {
+  width: calc(100% - 12px);
+  margin-inline: auto;
+}
+
+.splendor-mobile-supply {
+  width: calc(100% - 12px);
+  margin-inline: auto;
+}
+
+.splendor-mobile-supply .splendor-mobile-gems,
+.splendor-mobile-self .splendor-mobile-gems {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.splendor-mobile-supply .splendor-mobile-gems {
+  column-gap: clamp(6px, 1vw, 12px);
+}
+
+.splendor-mobile-self .splendor-mobile-bonus-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  flex-wrap: nowrap;
+}
+
+.splendor-player-chip-strip,
+.splendor-mobile-players .splendor-player-bonus-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  overflow: visible;
+}
+
+.splendor-mobile-players .splendor-player-bonus-row {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.splendor-player-mini-bonus.is-placeholder,
+.splendor-mobile-mini-bonus.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splendor-player-chip-strip i,
+.splendor-player-mini-bonus {
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: 1px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-purchase-notice {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: calc(100% - 12px);
+  margin-inline: auto;
+  border: 1px solid #e7d3a0;
+  border-radius: 7px;
+  background: #fff9e7;
+  color: #725524;
+  padding: 3px 5px;
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+.splendor-purchase-notice strong,
+.splendor-purchase-notice b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splendor-purchase-notice strong {
+  min-width: 0;
+}
+
+.splendor-purchase-notice.is-empty {
+  color: #9e927e;
+  justify-content: center;
+}
+
+.splendor-purchase-card-art {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+}
+
+.splendor-purchase-notice .splendor-mobile-cost {
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.splendor-purchase-notice .splendor-mobile-cost-token {
+  min-width: 12px;
+  height: 12px;
+  font-size: 7px;
+}
+
+.splendor-mobile-confirm-row {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.splendor-mobile-confirm-row button {
+  flex: 0 0 clamp(48px, 16vw, 64px);
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.splendor-mobile-confirm-row .is-cancel {
+  background: #ef4f2d;
+}
+
+.splendor-mobile-confirm-row .is-confirm {
+  background: #79cf11;
+  color: #224600;
+}
+
+.splendor-mobile-confirm-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.splendor-mobile-confirm-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.splendor-mobile-confirm-chips .splendor-mobile-cost {
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.splendor-mobile-confirm-chips .splendor-mobile-cost-token {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.splendor-mobile-confirm-hint {
+  color: #89621c;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.splendor-mobile-confirm-row .is-reserve {
+  background: #ffc36b;
+  color: #623800;
+}
+
+.splendor-mobile-confirm-row.is-card-action .splendor-mobile-confirm-chips {
+  flex: 0 1 auto;
+}
+
+.splendor-mobile-confirm-row.is-card-action .splendor-mobile-cost {
+  flex-wrap: wrap;
+}
+
+.splendor-mobile-confirm-row.is-card-action .splendor-mobile-cost-token {
+  min-width: 17px;
+  height: 17px;
+  font-size: 9px;
+}
+
+.splendor-player-mini-bonus.is-white {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #8b98a5;
+  color: #243142;
+}
+
+.splendor-mobile-opponent-reserves {
+  grid-column: 1 / -1;
+  color: #765622;
+}
+
+.splendor-mobile-empty-action {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  color: #5f6e80;
+  font-size: 9px;
+}
+
+.splendor-mobile-empty-action button {
+  border: 0;
+  border-radius: 5px;
+  background: #e9eef4;
+  color: #29435e;
+  padding: 4px 7px;
+  font-size: 9px;
+}
+
+.splendor-result-reopen {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.splendor-result-reopen button {
+  border: 1px solid #d7a73a;
+  border-radius: 8px;
+  background: #fff7dc;
+  color: #6d4d16;
+  padding: 5px 12px;
+  font-weight: 700;
 }

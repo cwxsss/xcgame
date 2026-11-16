@@ -298,8 +298,12 @@ async function roomFor(game, seats) {
   await request(gemAIPath + '/join', { playerName: '满座验证' }, 409);
   const gemStarted = await waitForState(soloMerchant, (G) => G.started);
   assert.deepEqual(gemStarted.bots, ['1']);
-  await waitForState(soloMerchant, (G) => G.timeoutCounts?.['0'] === 1);
-  await play(gemAI, soloMerchant, 'takeGems', ['white', 'blue', 'green']);
+  const skippedMerchant = await waitForState(
+    soloMerchant,
+    (G, state) =>
+      G.timeoutCounts?.['0'] === 1 && state.ctx.currentPlayer === '1',
+  );
+  assert.equal(skippedMerchant.afkPlayers?.includes('0'), false);
   await waitForState(soloMerchant, (G, state) => {
     const bot = G.players[1];
     return (
@@ -310,6 +314,41 @@ async function roomFor(game, seats) {
     );
   });
 
+  const replay = await roomFor('splendor', 2);
+  const [replayHost, replayGuest] = replay.players;
+  const replayPath = '/games/splendor/' + replay.matchID + '/rematch';
+  const replaySeat = (player) => ({
+    playerID: player.id,
+    credentials: player.credentials,
+  });
+  await request(
+    replayPath,
+    { ...replaySeat(replayHost), credentials: 'invalid' },
+    403,
+  );
+  await request(replayPath, replaySeat(replayHost), 409);
+  await play(replay.matchID, replayHost, 'setActionSeconds', 1);
+  await play(replay.matchID, replayHost, 'startGame');
+  await waitForState(replayHost, (_, state) => Boolean(state.ctx.gameover));
+  const [nextHost, nextGuest] = await Promise.all(
+    replay.players.map((player) => request(replayPath, replaySeat(player))),
+  );
+  assert.notEqual(nextHost.matchID, replay.matchID);
+  assert.equal(nextGuest.matchID, nextHost.matchID);
+  assert.equal(nextHost.playerID, replayHost.id);
+  assert.equal(nextGuest.playerID, replayGuest.id);
+  assert.notEqual(nextHost.playerCredentials, replayHost.credentials);
+  assert.deepEqual(await request(replayPath, replaySeat(replayHost)), nextHost);
+  const nextMerchant = await connect('splendor', nextHost.matchID, nextHost);
+  assert.equal(nextMerchant.state.G.started, false);
+  assert.equal(nextMerchant.state.G.actionSeconds, 1);
+  assert.deepEqual(nextMerchant.state.G.afkPlayers, []);
+  await play(nextHost.matchID, nextMerchant, 'readyUp');
+  const nextOpponent = await connect('splendor', nextGuest.matchID, nextGuest);
+  await play(nextGuest.matchID, nextOpponent, 'readyUp');
+  const restartedGame = await play(nextHost.matchID, nextMerchant, 'startGame');
+  assert.equal(restartedGame.started, true);
+  assert.ok(restartedGame.players.every((player) => player.points === 0));
   const avalon = await roomFor('avalon', 5);
   const { matchID: questRoom, players: knights } = avalon;
   await verifyVoice(questRoom, knights);
@@ -444,7 +483,7 @@ async function roomFor(game, seats) {
   );
   assert.equal(botVoted.hasVoted, false);
   console.log(
-    '游戏入口、并发入座、宝石采集、阿瓦隆秘密远征、双兰配置和 AI 开局已验证。',
+    '游戏入口、并发入座、宝石采集、结算后再来一局、阿瓦隆秘密远征、双兰配置和 AI 开局已验证。',
   );
 })()
   .catch((error) => {
