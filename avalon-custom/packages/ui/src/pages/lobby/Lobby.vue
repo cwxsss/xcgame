@@ -31,6 +31,7 @@
           <v-btn
             class="admin-entry"
             variant="text"
+            color="#111111"
             size="small"
             prepend-icon="mdi-shield-key-outline"
             @click="openAdminDialog"
@@ -720,7 +721,7 @@ h1 {
   gap: 10px;
   margin-bottom: 14px;
 }
-.admin-entry {
+.rooms-heading .admin-entry.v-btn {
   margin-left: auto;
   color: #111;
   background: #f2f5f8;
