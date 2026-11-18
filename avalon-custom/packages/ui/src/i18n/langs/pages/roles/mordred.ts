@@ -1,0 +1,319 @@
+import type { TLanguage } from '@/i18n/interface';
+import { Dictionary } from '@avalon/types';
+
+export const mordred: { [key in TLanguage]: Dictionary<string> } = {
+  vi: {
+    generalInformation: 'Thông tin chung:',
+    playingAsMordred:
+      'Chơi {mordred} cho bạn lợi thế đặc biệt là không bị {merlin} nhận biết và dẫn dắt tay sai phe Ác. Mục tiêu là phá kế hoạch phe Thiện và bảo đảm phe Ác chiến thắng, đồng thời giữ vỏ bọc đồng minh trung thành.',
+    generalTips: 'Mẹo chung:',
+    hiddenIdentity: 'Giữ danh tính ẩn:',
+    hiddenIdentityContent:
+      'Với {mordred}, việc {merlin} không biết bạn là lợi thế lớn. Hãy giữ lợi thế bằng cách hòa nhập với người phe Thiện.',
+    distrust: 'Khéo léo gieo sự mất lòng tin:',
+    distrustContent: 'Dùng ảnh hưởng để tạo nghi ngờ về người khác mà không thu hút quá nhiều chú ý vào mình.',
+    commandTheShadows:
+      'Với {mordred}, bạn điều khiển bóng tối và tác động ván chơi từ hậu trường. Bằng sự xảo quyệt và đánh lừa, bạn có thể dẫn phe Ác đến chiến thắng, khiến phe Thiện mãi mù mờ. Hãy nhập vai và giành ưu thế!',
+    identifyMerlin: 'Nhận diện {merlin}:',
+    identifyMerlinContent: 'Cố suy ra ai là {merlin} mà không lộ mình, để Sát thủ của bạn có thể loại họ vào cuối ván.',
+    coordinateMinions: 'Phối hợp với các Tay sai:',
+    coordinateMinionsContent:
+      'Hợp tác với những người phe Ác khác để lên chiến thuật và phá kế hoạch phe Thiện. Giao tiếp và phối hợp là chìa khóa.',
+    leadShadows: 'Dẫn dắt từ bóng tối:',
+    leadShadowsContent:
+      'Là người dẫn dắt phe Ác, hãy chỉ đạo các Tay sai kín đáo và không bao giờ tiết lộ vai thật. Tác động đến kết quả mà không thu hút sự chú ý.',
+    protectIdentity: 'Bảo vệ danh tính:',
+    protectIdentityContent:
+      'Tránh cho {merlin} manh mối về vai của bạn hoặc các Tay sai đồng minh. Tính toán hành động và che giấu ý định.',
+    strategicTips: 'Mẹo chiến thuật',
+    confusePlayers: 'Gây bối rối cho người phe Thiện:',
+    confusePlayersContent:
+      'Đưa ra quyết định khiến phe Thiện mất phương hướng và Merlin khó dẫn dắt họ hơn. Làm nhiễu phán đoán của họ là điều thiết yếu.',
+    useDisinformation: 'Dùng thông tin sai lệch:',
+    useDisinformationContent:
+      'Đánh lạc hướng người phe Thiện bằng thông tin sai để đưa họ xa sự thật. Điều này có thể chuyển sự chú ý và phá chiến thuật của họ.',
+    cultivateAlliances: 'Xây dựng liên minh:',
+    cultivateAlliancesContent:
+      'Giả vờ cùng phe với người phe Thiện để giành lòng tin và điều khiển ván chơi có lợi cho phe Ác. Vỏ bọc hai mặt có thể quyết định việc xoay chuyển lựa chọn.',
+    controlNarrative: 'Dẫn dắt câu chuyện:',
+    controlNarrativeContent:
+      'Bạn có thể điều hướng thảo luận và quyết định. Hãy dùng khả năng đó khôn ngoan vì phe Ác. Bằng cách dẫn dắt trao đổi, bạn định hình hướng đi của ván chơi.',
+    seoTeam: 'Ác. Thắng bằng ba Nhiệm vụ thất bại hoặc Ám sát đúng {merlin} sau ba lần thành công.',
+    seoAbility:
+      '{merlin} không thấy Mordred lúc bắt đầu. Trong thiết lập cổ điển, Mordred biết những người phe Ác có thể nhìn thấy khác, ngoại trừ {oberon}.',
+    seoLimit:
+      'Bị ẩn khỏi {merlin} không khiến Mordred thành Thiện hay miễn bị suy luận. Kết quả Nhiệm vụ và phiếu bầu vẫn có thể làm lộ anh ta; anh ta có thể chọn Thành công hoặc Thất bại.',
+    seoScenario1:
+      'Nếu được đưa vào Đội đáng tin, hãy quyết định liệu một lá Thất bại ngay lúc này có đáng đánh đổi lòng tin đó không. Lá Thành công có thể giữ chỗ của bạn, nhưng cũng đưa phe Thiện gần ba lần thành công hơn.',
+    seoScenario2:
+      'Nếu Nhiệm vụ có bạn thất bại, giải thích lựa chọn bằng cùng bằng chứng công khai như mọi người. Đừng mặc định người từng ủng hộ bạn là Merlin: Merlin chưa từng nhận thông tin bạn thuộc phe Ác.',
+  },
+  en: {
+    generalInformation: 'General Information:',
+    playingAsMordred:
+      'Playing as {mordred} gives you the unique advantage of being unknown to {merlin} and leading the minions of evil. Your objective is to disrupt the forces of good and ensure that evil prevails, all while maintaining your disguise as a loyal ally.',
+    generalTips: 'General Tips:',
+    hiddenIdentity: 'Maintain your hidden identity:',
+    hiddenIdentityContent:
+      'As {mordred}, not being known to {merlin} is a huge advantage. Keep it that way by blending in with the good players.',
+    distrust: 'Sow distrust subtly:',
+    distrustContent: 'Use your influence to cast doubt on others without drawing too much attention to yourself.',
+    commandTheShadows:
+      'As {mordred}, you command the shadows and influence the game from behind the scenes. Employing cunning and deception, you can lead evil to victory and keep the forces of good forever in the dark. Embrace your role and reign supreme!',
+    identifyMerlin: 'Identify {merlin}:',
+    identifyMerlinContent:
+      "Try to deduce who {merlin} is without revealing yourself so your assassin can eliminate them at the game's end.",
+    coordinateMinions: 'Coordinate with your minions:',
+    coordinateMinionsContent:
+      "Work together with the other evil players to strategize and disrupt the good players' plans. Communication and coordination are key.",
+    leadShadows: 'Lead from the shadows:',
+    leadShadowsContent:
+      'As a leader of the evil, lead the minions subtly and never reveal your true role. Influence outcomes without drawing attention to yourself.',
+    protectIdentity: 'Protect your identity:',
+    protectIdentityContent:
+      'Avoid giving {merlin} any clues about your role or the roles of your fellow evil minions. Keep your moves calculated and your intentions hidden.',
+    strategicTips: 'Strategic Tips',
+    confusePlayers: 'Confuse good players:',
+    confusePlayersContent:
+      'Make decisions that can throw off good players and make it harder for Merlin to guide them. Clouding their judgment is essential.',
+    useDisinformation: 'Use disinformation:',
+    useDisinformationContent:
+      'Mislead good players with incorrect information to lead them away from the truth. This can divert their attention and disrupt their strategies.',
+    cultivateAlliances: 'Cultivate alliances:',
+    cultivateAlliancesContent:
+      'Falsely align with good players to gain their trust and manipulate the game in favor of evil. This dual role can be pivotal in swaying decisions.',
+    controlNarrative: 'Control the narrative:',
+    controlNarrativeContent:
+      "You have the power to steer discussions and decisions. Use it wisely to benefit the evil cause. By guiding the dialogue, you shape the game's direction.",
+    seoTeam: 'Evil. Win through three failed missions or a successful assassination of {merlin} after three successes.',
+    seoAbility:
+      '{merlin} does not see Mordred at the start. Mordred knows the other visible evil players in the classic setup, except {oberon}.',
+    seoLimit:
+      'Being hidden from {merlin} does not make Mordred good or immune to deduction. Mission results and votes can still expose him; he may choose Success or Fail.',
+    seoScenario1:
+      'If you are included in a trusted team, decide whether an immediate Fail is worth losing that trust. A Success can preserve your place, but also moves good closer to three successes.',
+    seoScenario2:
+      'If a mission with you fails, explain your choices using the same public evidence as everyone else. Do not assume another player’s earlier support proves they are Merlin: Merlin never received your evil identity.',
+  },
+  ru: {
+    generalInformation: 'Общая информация:',
+    playingAsMordred:
+      'Играя за {mordred}, вы получаете уникальное преимущество — оставаться неизвестным для {merlin} и руководить слугами зла. Ваша задача — нарушить планы сил добра и добиться торжества зла, при этом скрываясь под маской преданного союзника.',
+    generalTips: 'Общие советы:',
+    hiddenIdentity: 'Сохраняйте вашу скрытую личность:',
+    hiddenIdentityContent:
+      'Будучи {mordred}, оставаться неизвестным для {merlin} — это огромное преимущество. Поддерживайте это, смешиваясь с добрыми игроками.',
+    distrust: 'Тонко сеять недоверие:',
+    distrustContent:
+      'Используйте свое влияние, чтобы посеять сомнения о других, не привлекая излишнего внимания к себе.',
+    commandTheShadows:
+      'Будучи {mordred}, вы управляете из теней и влияете на игру за кулисами. Используя хитрость и обман, вы можете привести зло к победе и навеки оставить силы добра во тьме. Примите свою роль и царствуйте!',
+    identifyMerlin: 'Определите {merlin}:',
+    identifyMerlinContent:
+      'Постарайтесь выяснить, кто такой {merlin}, не раскрывая себя, чтобы ваш убийца мог ликвидировать его в конце игры.',
+    coordinateMinions: 'Координируйте действия с вашими слугами:',
+    coordinateMinionsContent:
+      'Работайте вместе с другими злыми игроками для разработки стратегии и разрушения планов добрых игроков. Коммуникация и координация — ключ к успеху.',
+    leadShadows: 'Возглавляйте из теней:',
+    leadShadowsContent:
+      'Будучи лидером зла, руководство слугами должно быть ненавязчивым и без раскрытия вашей истинной роли. Влиять на исходы, не привлекая внимания.',
+    protectIdentity: 'Защищайте свою личность:',
+    protectIdentityContent:
+      'Избегайте предоставления {merlin} любых подсказок о вашей роли или ролях ваших соратников по злу. Действуйте расчетливо и скрытно.',
+    strategicTips: 'Стратегические советы:',
+    confusePlayers: 'Запутайте добрых игроков:',
+    confusePlayersContent:
+      'Принимайте решения, которые могут сбить добрых игроков с толку и затруднить {merlin} руководство ими. Запутывание их суждений важно.',
+    useDisinformation: 'Используйте дезинформацию:',
+    useDisinformationContent:
+      'Вводите добрых игроков в заблуждение неверной информацией, чтобы отвлечь их от истины. Это может отвлечь их внимание и нарушить их стратегии.',
+    cultivateAlliances: 'Создавайте альянсы:',
+    cultivateAlliancesContent:
+      'Фальшиво примиритесь с добрыми игроками, чтобы завоевать их доверие и манипулировать игрой в пользу зла. Эта двойная роль может быть решающей для изменения решений.',
+    controlNarrative: 'Управляйте нарративом:',
+    controlNarrativeContent:
+      'Вы обладаете властью влиять на обсуждения и решения. Используйте это благополучно для зла. Направляя диалог, вы формируете направление игры.',
+    seoTeam: 'Зло. Победите через три проваленные миссии. После трёх успешных можно победить, если убит {merlin}.',
+    seoAbility:
+      '{merlin} не видит Мордреда в начале игры. В классическом составе Мордред знает остальных видимых злых игроков; исключение — {oberon}.',
+    seoLimit:
+      '{merlin} не видит Мордреда, но это не делает Мордреда добрым и не защищает от выводов по миссиям и голосованиям. На миссии он может выбрать успех или провал.',
+    seoScenario1:
+      'Если вас включили в команду, которой доверяют, решите, стоит ли немедленный провал потери доверия. Успех может сохранить ваше место в команде, но приблизит добро к победе по миссиям.',
+    seoScenario2:
+      'Если миссия с вами провалилась, объясняйте решения общедоступными фактами. Предыдущая поддержка другого игрока не доказывает, что он Мерлин: Мерлин не получил информацию о вашей злой роли.',
+  },
+  'zh-CN': {
+    generalInformation: '一般信息：',
+    playingAsMordred:
+      '作为{mordred}，您拥有不被{merlin}发现的独特优势，并领导邪恶的仆从。您的目标是破坏正义的力量，确保邪恶占上风，同时保持自己为忠诚盟友的伪装。',
+    generalTips: '一般提示:',
+    hiddenIdentity: '保持您的隐藏身份:',
+    hiddenIdentityContent: '作为{mordred}，不被{merlin}发现是一个巨大的优势。通过与正派玩家融合来保持这种状态。',
+    distrust: '巧妙地播下不信任的种子:',
+    distrustContent: '利用您的影响力不引人注目地对他人产生怀疑。',
+    commandTheShadows:
+      '作为{mordred}，您从幕后操控黑暗并影响游戏。运用狡诈和欺骗，您可以引领邪恶走向胜利，并将善良的力量永远保持在黑暗中。接受您的角色并掌控大局！',
+    identifyMerlin: '识别{merlin}:',
+    identifyMerlinContent: '尝试找出{merlin}是谁而不暴露自己，以便让您的刺客在游戏结束时消灭他。',
+    coordinateMinions: '与您的仆从进行协调:',
+    coordinateMinionsContent: '与其他邪恶玩家一起制定策略，破坏正派玩家的计划。沟通和协调是关键。',
+    leadShadows: '从阴影中领导:',
+    leadShadowsContent: '作为邪恶的领导者，以微妙的方式领导仆从，永远不要暴露您的真实角色。不引人注目地影响结果。',
+    protectIdentity: '保护您的身份:',
+    protectIdentityContent: '避免给{merlin}任何关于您或您邪恶同伙的角色的线索。保持计算且隐藏的意图。',
+    strategicTips: '战略提示:',
+    confusePlayers: '让正派玩家困惑:',
+    confusePlayersContent: '做出可以误导正派玩家的决定，使{merlin}更难引导他们。混淆他们的判断至关重要。',
+    useDisinformation: '使用虚假信息:',
+    useDisinformationContent: '用错误的信息误导正派玩家，使他们远离真相。可以转移他们的注意力并破坏他们的策略。',
+    cultivateAlliances: '建立联盟:',
+    cultivateAlliancesContent:
+      '假装与正派玩家结盟以获得他们的信任，并操控游戏对邪恶有利。这种双重角色可以在决策中起到关键作用。',
+    controlNarrative: '掌控叙事:',
+    controlNarrativeContent: '您拥有影响讨论和决策的力量。将其明智地用于邪恶的事业。通过引导对话，您塑造了游戏的方向。',
+    seoTeam: '坏人。让三次任务失败，或在三次成功后刺杀{merlin}获胜。',
+    seoAbility: '{merlin}在开局时看不到莫德雷德。经典配置中，莫德雷德知道其他可见的邪恶玩家，但看不到{oberon}。',
+    seoLimit:
+      '不被{merlin}看到，不等于莫德雷德是好人或无法被推理识破。任务结果和投票仍可能暴露他；他可以出成功或失败。',
+    seoScenario1:
+      '进入受信任的队伍后，判断立刻出失败是否值得失去信任。出成功可能保住下次入队机会，但也让好人更接近三次成功。',
+    seoScenario2:
+      '如果有你参与的任务失败，请用公开证据解释决定。某人之前支持你，不代表他就是梅林：梅林没有得到你的邪恶身份信息。',
+  },
+  'zh-TW': {
+    generalInformation: '一般信息：',
+    playingAsMordred:
+      '作為{mordred}，您擁有不被{merlin}發現的獨特優勢，並領導邪惡的追隨者。您的目標是擾亂正義的力量，確保邪惡占上風，同時維持您作為忠誠盟友的假象。',
+    generalTips: '一般建議:',
+    hiddenIdentity: '保持您的隱藏身份:',
+    hiddenIdentityContent: '作為{mordred}，不被{merlin}發現是極大的優勢。通過與好玩家混合保持這種狀態。',
+    distrust: '巧妙地播下不信任的種子:',
+    distrustContent: '利用您的影響力，不引人注目地對其他人產生懷疑。',
+    commandTheShadows:
+      '作為{mordred}，您從幕後指揮並影響遊戲。運用狡詐和欺騙，您可以引領邪惡走向勝利，並將正義的力量永遠蒙在鼓裡。接受您的角色並掌控全局！',
+    identifyMerlin: '識別{merlin}:',
+    identifyMerlinContent: '嘗試找出{merlin}是誰而不暴露自己，使您的刺客能在遊戲結束時消滅他們。',
+    coordinateMinions: '與您的追隨者協調:',
+    coordinateMinionsContent: '與其他邪惡玩家合作制定策略，破壞好玩家的計劃。溝通和協調是關鍵。',
+    leadShadows: '從陰影中領導:',
+    leadShadowsContent: '作為邪惡的領導者，要小心地領導追隨者，永遠不要揭露您真正的身份。不引人注目地影響結果。',
+    protectIdentity: '保護您的身份:',
+    protectIdentityContent:
+      '避免向{merlin}透露任何關於您角色或其他邪惡同伴角色的線索。保持您的舉動冷靜謹慎，意圖隱藏。',
+    strategicTips: '策略提示:',
+    confusePlayers: '讓好玩家困惑:',
+    confusePlayersContent: '做出能讓好玩家產生混淆的決定，使得{merlin}更難以指導他們。混淆他們的判斷至關重要。',
+    useDisinformation: '使用虛假信息:',
+    useDisinformationContent: '用錯誤信息誤導好玩家，讓他們遠離真相。這可以分散他們的注意力並干擾他們的策略。',
+    cultivateAlliances: '培養聯盟:',
+    cultivateAlliancesContent:
+      '假裝與好玩家結盟以獲取他們的信任並操縱遊戲以有利於邪惡。這種雙重角色在決策中可能至關重要。',
+    controlNarrative: '掌控敘事:',
+    controlNarrativeContent:
+      '您擁有引導討論和決策的力量。明智地利用它來促進邪惡的目的。通過引導對話，您可以塑造遊戲的方向。',
+    seoTeam: '壞人。讓三次任務失敗，或在三次成功後刺殺{merlin}獲勝。',
+    seoAbility: '{merlin}在開局時看不到莫德雷德。經典配置中，莫德雷德知道其他可見的邪惡玩家，但看不到{oberon}。',
+    seoLimit:
+      '不被{merlin}看到，不等於莫德雷德是好人或無法被推理識破。任務結果和投票仍可能暴露他；他可以出成功或失敗。',
+    seoScenario1:
+      '進入受信任的隊伍後，判斷立刻出失敗是否值得失去信任。出成功可能保住下次入隊機會，但也讓好人更接近三次成功。',
+    seoScenario2:
+      '如果有你參與的任務失敗，請用公開證據解釋決定。某人之前支持你，不代表他就是梅林：梅林沒有得到你的邪惡身分資訊。',
+  },
+  es: {
+    generalInformation: 'Información general:',
+    playingAsMordred:
+      'Jugar como {mordred} te ofrece la ventaja única de ser desconocido para {merlin} y liderar a los esbirros del mal. Tu objetivo es interrumpir las fuerzas del bien y asegurar que el mal prevalezca, todo mientras mantienes tu disfraz de aliado leal.',
+    generalTips: 'Consejos generales:',
+    hiddenIdentity: 'Mantén tu identidad oculta:',
+    hiddenIdentityContent:
+      'Como {mordred}, no ser conocido por {merlin} es una gran ventaja. Mantén esto así camuflándote entre los jugadores buenos.',
+    distrust: 'Siembra desconfianza sutilmente:',
+    distrustContent:
+      'Usa tu influencia para generar dudas sobre otros sin llamar demasiado la atención sobre ti mismo.',
+    commandTheShadows:
+      'Como {mordred}, comandas las sombras e influyes en el juego entre bastidores. Empleando astucia y engaño, puedes llevar al mal hacia la victoria y mantener a las fuerzas del bien en la oscuridad. ¡Abraza tu papel y reina supremo!',
+    identifyMerlin: 'Identifica a {merlin}:',
+    identifyMerlinContent:
+      'Intenta deducir quién es {merlin} sin revelarte para que tu asesino pueda eliminarlo al final del juego.',
+    coordinateMinions: 'Coordina con tus esbirros:',
+    coordinateMinionsContent:
+      'Trabaja en conjunto con los otros jugadores malos para diseñar estrategias y alterar los planes de los jugadores buenos. La comunicación y la coordinación son clave.',
+    leadShadows: 'Lidera desde las sombras:',
+    leadShadowsContent:
+      'Como líder del mal, lidera los esbirros sutilmente y nunca reveles tu verdadero papel. Influye en los resultados sin llamar la atención.',
+    protectIdentity: 'Protege tu identidad:',
+    protectIdentityContent:
+      'Evita dar a {merlin} cualquier pista sobre tu papel o los roles de tus compañeros esbirros del mal. Mantén tus movimientos calculados y tus intenciones ocultas.',
+    strategicTips: 'Consejos estratégicos:',
+    confusePlayers: 'Confunde a los jugadores buenos:',
+    confusePlayersContent:
+      'Toma decisiones que puedan desorientar a los jugadores buenos y dificultar que {merlin} los guíe. Nublar su juicio es esencial.',
+    useDisinformation: 'Usa desinformación:',
+    useDisinformationContent:
+      'Desorienta a los jugadores buenos con información incorrecta para alejarlos de la verdad. Esto puede desviar su atención y perturbar sus estrategias.',
+    cultivateAlliances: 'Cultiva alianzas:',
+    cultivateAlliancesContent:
+      'Alinearse falsamente con los jugadores buenos para ganar su confianza y manipular el juego a favor del mal. Este doble rol puede ser crucial para influir en las decisiones.',
+    controlNarrative: 'Controla la narrativa:',
+    controlNarrativeContent:
+      'Tienes el poder de guiar las discusiones y decisiones. Úsalo sabiamente para beneficiar la causa del mal. Al guiar el diálogo, puedes moldear la dirección del juego.',
+    seoTeam: 'Mal. Gana con tres misiones fallidas o asesinando a {merlin} después de tres éxitos.',
+    seoAbility:
+      '{merlin} no ve a Mordred al inicio. Mordred conoce a los demás jugadores visibles del mal en la configuración clásica, excepto a {oberon}.',
+    seoLimit:
+      'Estar oculto para {merlin} no hace bueno a Mordred ni impide deducir su identidad. Los resultados y votos pueden delatarlo; puede elegir Éxito o Fracaso.',
+    seoScenario1:
+      'Si entras en un equipo de confianza, decide si un Fracaso inmediato compensa perderla. Un Éxito puede mantenerte en el equipo, pero acerca al bien a completar tres misiones.',
+    seoScenario2:
+      'Si falla una misión contigo, explica tus decisiones con pruebas públicas. Que alguien te apoyara antes no demuestra que sea Merlín: él no recibió información sobre tu lealtad al mal.',
+  },
+  pt: {
+    generalInformation: 'Informações Gerais:',
+    playingAsMordred:
+      'Jogar como {mordred} lhe dá a vantagem única de ser desconhecido para {merlin} e liderar os lacaios do mal. Seu objetivo é perturbar as forças do bem e garantir que o mal prevaleça, tudo enquanto mantém seu disfarce como um aliado leal.',
+    generalTips: 'Dicas Gerais:',
+    hiddenIdentity: 'Mantenha sua identidade oculta:',
+    hiddenIdentityContent:
+      'Como {mordred}, não ser conhecido por {merlin} é uma grande vantagem. Mantenha isso misturando-se com os jogadores do bem.',
+    distrust: 'Semeie desconfiança sutilmente:',
+    distrustContent: 'Use sua influência para lançar dúvidas sobre os outros sem chamar muita atenção para si mesmo.',
+    commandTheShadows:
+      'Como {mordred}, você comanda as sombras e influencia o jogo nos bastidores. Empregando astúcia e engano, você pode levar o mal à vitória e manter as forças do bem para sempre na escuridão. Abrace seu papel e reine supremo!',
+    identifyMerlin: 'Identifique {merlin}:',
+    identifyMerlinContent:
+      'Tente deduzir quem é {merlin} sem se revelar para que seu assassino possa eliminá-lo no final do jogo.',
+    coordinateMinions: 'Coordene com seus lacaios:',
+    coordinateMinionsContent:
+      'Trabalhe junto com os outros jogadores do mal para elaborar estratégias e perturbar os planos dos jogadores do bem. Comunicação e coordenação são fundamentais.',
+    leadShadows: 'Lidere das sombras:',
+    leadShadowsContent:
+      'Como líder do mal, lidere os lacaios sutilmente e nunca revele seu verdadeiro papel. Influencie os resultados sem chamar atenção para si mesmo.',
+    protectIdentity: 'Proteja sua identidade:',
+    protectIdentityContent:
+      'Evite dar a {merlin} quaisquer pistas sobre seu papel ou os papéis de seus companheiros lacaios do mal. Mantenha seus movimentos calculados e suas intenções ocultas.',
+    strategicTips: 'Dicas Estratégicas',
+    confusePlayers: 'Confunda os jogadores do bem:',
+    confusePlayersContent:
+      'Tome decisões que possam confundir os jogadores do bem e dificultar que Merlin os guie. Nublar o julgamento deles é essencial.',
+    useDisinformation: 'Use desinformação:',
+    useDisinformationContent:
+      'Engane os jogadores do bem com informações incorretas para afastá-los da verdade. Isso pode desviar a atenção deles e perturbar suas estratégias.',
+    cultivateAlliances: 'Cultive alianças:',
+    cultivateAlliancesContent:
+      'Alinhe-se falsamente com jogadores do bem para ganhar sua confiança e manipular o jogo a favor do mal. Este papel duplo pode ser fundamental para influenciar decisões.',
+    controlNarrative: 'Controle a narrativa:',
+    controlNarrativeContent:
+      'Você tem o poder de direcionar discussões e decisões. Use-o sabiamente para beneficiar a causa do mal. Ao guiar o diálogo, você molda a direção do jogo.',
+    seoTeam: 'Mal. Vença com três missões fracassadas ou assassinando {merlin} após três sucessos.',
+    seoAbility:
+      '{merlin} não vê Mordred no início. Mordred conhece os demais jogadores visíveis do mal na configuração clássica, exceto {oberon}.',
+    seoLimit:
+      'Ficar oculto de {merlin} não torna Mordred bom nem impede deduções. Resultados e votos podem revelar sua lealdade; ele pode escolher Sucesso ou Falha.',
+    seoScenario1:
+      'Se entrar em uma equipe confiável, avalie se uma Falha imediata compensa perder a confiança. Um Sucesso pode manter seu lugar, mas aproxima o bem de completar três missões.',
+    seoScenario2:
+      'Se uma missão com você fracassar, explique suas decisões com evidências públicas. O apoio anterior de alguém não prova que seja Merlin: ele não recebeu sua identidade maligna.',
+  },
+};

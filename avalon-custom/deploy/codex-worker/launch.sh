@@ -1,0 +1,104 @@
+#!/bin/bash
+set -eu
+# Only this root-owned launcher is permitted by sudo. No caller arguments.
+[ "$#" -eq 0 ] || exit 1
+exec 9>/opt/avalon-codex/worker.lock
+locked=false
+container="avalon-codex-worker-$$"
+heartbeat=''
+child=''
+umask 077
+output=$(mktemp /opt/avalon-codex/result.XXXXXX)
+cleanup() {
+  if [ -n "$heartbeat" ]; then
+    kill "$heartbeat" >/dev/null 2>&1 || true
+    wait "$heartbeat" 2>/dev/null || true
+  fi
+  if [ -n "$child" ]; then
+    kill -KILL "$child" >/dev/null 2>&1 || true
+    wait "$child" 2>/dev/null || true
+  fi
+  # Also cover a create/start request that was in flight when SSH disconnected.
+  if [ "$locked" = true ]; then
+    for attempt in 1 2 3 4 5; do
+      docker rm -f "$container" >/dev/null 2>&1 || true
+      sleep 0.2
+    done
+  fi
+  rm -f "$output"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+launcher=$$
+# This pipe belongs to SSH itself, unlike the container's stdout (owned by dockerd).
+# A disconnected client must terminate the launcher and remove the whole container.
+(
+  trap 'kill -TERM "$launcher"; exit 1' PIPE
+  while true; do
+    sleep 1
+    if ! printf '\n'; then kill -TERM "$launcher"; exit 1; fi
+  done
+) &
+heartbeat=$!
+# Keep the legacy lock shared: an older launcher holds it exclusively, so a
+# rolling update cannot overlap its request. Each new request also owns one slot.
+# Quota/catalog reads may briefly hold both slots as a game turn. Wait
+# before dispatching, without replaying a decision that may already have run.
+# Polling keeps cancellation responsive; the heartbeat also covers this wait.
+# Serialize admission while the head waits for either execution slot. The OS
+# schedules admission contenders; newcomers cannot take a slot before the head.
+# Nonblocking acquisition keeps the existing SSH cancellation path responsive.
+deadline=$((SECONDS + 600))
+exec 8>/opt/avalon-codex/worker-queue.lock
+admitted=false
+busy() {
+  kill "$heartbeat" >/dev/null 2>&1 || true
+  wait "$heartbeat" 2>/dev/null || true
+  heartbeat=''
+  printf '%s\n' '{"ok":false,"error":"busy"}'
+  exit 0
+}
+while [ "$locked" = false ]; do
+  if [ "$admitted" = false ] && flock -x -n 8; then admitted=true; fi
+  if [ "$admitted" = true ] && flock -s -n 9; then
+    for slot in 1 2; do
+      exec 10>"/opt/avalon-codex/worker-slot-$slot.lock"
+      if flock -n 10; then
+        locked=true
+        break
+      fi
+      exec 10>&-
+    done
+    if [ "$locked" = true ]; then break; fi
+    flock -u 9
+  fi
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    busy
+  fi
+  sleep 0.2
+done
+flock -u 8
+exec 8>&-
+# Complete creation before spawning the attach client: cleanup always has a
+# registered container to remove, even if SSH stops during slow image/storage work.
+docker create -i --name "$container" --memory=512m --memory-swap=512m \
+  --cpus=1 --pids-limit=128 --cgroup-parent=avalon-codex.slice \
+  --cap-drop=ALL --security-opt=no-new-privileges \
+  --read-only --user=10001:10001 --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+  -e HOME=/tmp -e CODEX_HOME=/state \
+  -v /opt/avalon-codex/state:/state \
+  -v /opt/avalon-codex/worker.cjs:/worker.cjs:ro \
+  --entrypoint node avalon-codex:0.159.2 /worker.cjs </dev/null >/dev/null
+docker start -a -i "$container" <&0 >"$output" &
+child=$!
+
+status=0
+wait "$child" || status=$?
+kill "$heartbeat" >/dev/null 2>&1 || true
+wait "$heartbeat" 2>/dev/null || true
+heartbeat=''
+if [ "$status" -ne 0 ]; then
+  printf '%s\n' '{"ok":false,"error":"failed"}'
+else
+  cat "$output"
+fi

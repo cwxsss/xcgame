@@ -1,0 +1,308 @@
+import { index, prop } from '@typegoose/typegoose';
+
+import { VisualGameState } from '../game/state';
+import { GameOptions } from '../game/options';
+import type { AiLanguage } from './ai-language';
+import type { TRoles } from '../game/roles';
+import type { AiPlayerCount } from './ai-player-counts';
+
+export * from './list';
+
+export type TRoomState = CreatedRoomState | LockedRoomState | StartedRoomState;
+
+export type TVoteTarget = 'endGame' | 'endAndRestartGame';
+
+export class VoteRoomResult {
+  @prop({ required: true })
+  public total!: number;
+
+  @prop({ required: true })
+  public yes!: number;
+
+  @prop({ required: true })
+  public no!: number;
+
+  @prop({ required: true })
+  public required!: number;
+}
+
+export class VoteInRoom {
+  @prop({ required: true })
+  public target!: TVoteTarget;
+
+  @prop({ required: true, type: () => [VoteOfPlayer], _id: false })
+  public votes!: VoteOfPlayer[];
+
+  @prop({ required: true })
+  public result!: VoteRoomResult;
+}
+
+export type CodexSettings = { model: string; reasoning: string };
+export type CodexModelOption = { id: string; label: string; efforts: string[] };
+export type AiBotGameCapacity = 1 | 2 | 3;
+
+/** Admin-only operational view. Never includes instance environment or credentials. */
+export type AiBotInstanceStatus = {
+  id: string;
+  status: 'free' | 'busy' | 'unavailable';
+  quota: CodexWeeklyLimit | null;
+  modes: Record<AiBotMode, boolean>;
+  maxGames?: AiBotGameCapacity;
+  rooms?: { roomID: string; room?: AiBotInstanceStatus['room'] }[];
+  roomID?: string;
+  room?: {
+    status: AiRoomState['status'];
+    title?: string;
+    codex?: CodexSettings;
+    playerCount: number;
+    thinking: boolean;
+    waitingForHuman: boolean;
+  };
+};
+export type BotQuotaThresholds = Record<AiBotMode, { shortTerm: number; weekly: number }>;
+export type AiGameUsage = {
+  roomID: string;
+  instanceID: string;
+  startedAt: number;
+  checkedAt?: number;
+  status: AiRoomState['status'];
+  humanCount: number;
+  botCount: number;
+  mode: string;
+  language?: AiLanguage;
+  options: GameOptions;
+  settings: CodexSettings[];
+  inputTokens: number;
+  cachedTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  requests: number;
+  unknownUsageRequests: number;
+  weeklySpent: number | null;
+  shortTermSpent: number | null;
+};
+export type AiBotDashboard = {
+  checkedAt: number;
+  instances: AiBotInstanceStatus[];
+  thresholds: BotQuotaThresholds;
+  games: AiGameUsage[];
+  accountUsage: AiAccountUsage[];
+};
+export type AiAccountUsage = {
+  instanceID: string;
+  tokens: number | null;
+  gameCount: number;
+  weeklySpent: number | null;
+  shortTermSpent: number | null;
+  weeklyIncomplete: boolean;
+  shortTermIncomplete: boolean;
+};
+
+export * from './ai-language';
+export * from './ai-player-counts';
+export type AiBotDifficulty = 'smart' | 'regular';
+export type AiBotMode = AiBotDifficulty | 'beginner';
+
+export type BeginnerGameReview = {
+  decision: string;
+  observation: string;
+  next: string;
+  episodeID: string;
+  mission: number;
+  action: 'vote' | 'team' | 'card' | 'assassinate';
+};
+export type BeginnerReviewResponse = { status: 'complete'; review: BeginnerGameReview } | { status: 'unavailable' };
+
+export type AiRoomState = {
+  /** Owner human seat; absent in spectator-only bot matches. */
+  humanPlayerID?: string;
+  withFriend?: boolean;
+  /** Reserved human seats; older friend rooms default to two. */
+  humanSeats?: number;
+  humanPlayerIDs?: string[];
+  discussionPlayerID?: string;
+  humanTimers?: Record<
+    string,
+    { humanActionExpiresAt?: number; humanActionBaseExpiresAt?: number; humanTimeBankMs: number }
+  >;
+  /** Public one-human/four-bot room, including its ready preparation stage. */
+  publicBotGame?: boolean;
+  /** Beginner-only five-seat match with simpler bot communication. */
+  beginner?: boolean;
+  /** Settings chosen before creating the prepared public room. */
+  preparedDifficulty?: AiBotDifficulty;
+  title?: string;
+  launchExpiresAt?: number;
+  humanActionExpiresAt?: number;
+  humanActionBaseExpiresAt?: number;
+  /** Owner reserve shared across turns and discussion. */
+  humanTimeBankMs?: number;
+  /** Public human match with server-frozen model and reasoning settings. */
+  botDifficulty?: AiBotDifficulty;
+  waitingForHuman?: boolean;
+  waitingForDiscussion?: boolean;
+  discussionPending?: boolean;
+  /** Missing in older archives; discussion defaults to English. */
+  language?: AiLanguage;
+  /** Missing in older archives; the saved player list still identifies the size. */
+  playerCount?: AiPlayerCount;
+  /** Opening rules preset selected for this AI room. */
+  playMode?: import('../game/play-mode').PlayMode;
+  /** Only rooms created after the AI rating release participate in this season. */
+  profileRatingSeason?: number;
+  codex?: CodexSettings;
+  /** Restored inference label for archives that predate saved Codex settings. */
+  playedModel?: string;
+  status: 'ready' | 'running' | 'paused' | 'finished' | 'stopped';
+  /** The AI seat currently awaiting generation; cleared when idle or paused. */
+  thinkingPlayerID?: string;
+  /** Up to two public seats generating replies; omitted during secret mission cards. */
+  thinkingPlayerIDs?: string[];
+  canResumeTechnical?: boolean;
+  /** Read-only compatibility with historical archives; no current paid provider. */
+  costRub?: number;
+  model?: string;
+  fallbacks: number;
+  message: string;
+};
+
+export { aiPlayedModel } from './ai-model';
+export { aiRosterInfo } from './ai-roster';
+
+export class BaseRoomState {
+  /** Built-in local bot seats configured by the host. Roles are only exposed to the host while waiting. */
+  @prop({ type: () => [RoomBot], _id: false })
+  public roomBots?: RoomBot[];
+  public ai?: AiRoomState;
+  // Response-only: archived games have no live room or voice conversation.
+  public archived?: boolean;
+
+  @prop({ required: true })
+  public stage!: 'created' | 'locked' | 'started';
+
+  @prop({ required: true })
+  public roomID!: string;
+
+  @prop({ required: true })
+  public leaderID!: string;
+
+  @prop({ required: true })
+  public createAt!: string;
+
+  @prop({ required: true, type: () => [RoomPlayer], _id: false })
+  public players!: RoomPlayer[];
+
+  @prop({ _id: false })
+  public vote?: VoteInRoom;
+
+  @prop({ required: true, _id: false })
+  public options!: GameOptions;
+
+  @prop({ required: true, type: () => [ChatMessage], _id: false })
+  public chat!: ChatMessage[];
+}
+
+export class RoomBot {
+  @prop({ required: true })
+  public id!: string;
+
+  @prop()
+  public role?: TRoles;
+}
+
+export class CreatedRoomState extends BaseRoomState {
+  declare stage: 'created';
+}
+
+export class LockedRoomState extends BaseRoomState {
+  declare stage: 'locked';
+}
+
+@index({ roomID: 1 }, { unique: true })
+@index({ 'players.id': 1, 'game.stage': 1, _id: 1 })
+@index({ completionPending: 1, _id: 1 })
+export class StartedRoomState extends BaseRoomState {
+  @prop()
+  public completionPending?: boolean;
+  declare stage: 'started';
+
+  @prop({ required: true })
+  public startAt!: string;
+
+  @prop({ required: true, _id: false })
+  public game!: VisualGameState;
+}
+
+export class User {
+  @prop({ required: true })
+  public id!: string;
+}
+
+export class RoomPlayer extends User {
+  @prop({ required: true })
+  isLeader!: boolean;
+}
+
+export class VoteOfPlayer extends RoomPlayer {
+  @prop()
+  voteResult?: boolean;
+}
+
+export class ChatMessage {
+  @prop()
+  public requestID?: string;
+
+  @prop()
+  public id?: string;
+
+  @prop()
+  public kind?: 'text' | 'sticker';
+
+  @prop()
+  public stickerID?: string;
+
+  @prop({ required: true })
+  public userID!: string;
+
+  @prop({ required: true })
+  public message!: string;
+
+  @prop({ required: true })
+  public timestamp!: number;
+}
+
+export type ChatSendResult = { message: ChatMessage } | { error: 'invalidMessage' | 'notInRoom' | 'failed' };
+
+export type TMessage = {
+  id?: string;
+  roomID?: string;
+  text: string;
+  author: string;
+};
+
+/** Short model-written explanation; only returned through the AI spectator endpoint. */
+export type AiSpectatorDecision = {
+  playerID: string;
+  id: number;
+  seat: string;
+  mission: number;
+  stage: string;
+  choice: string;
+  reason: string;
+};
+
+export type CodexResetCredits = {
+  availableCount: number;
+  credits: { id: string; expiresAt: number | null }[] | null;
+};
+export type CodexResetOutcome = 'reset' | 'alreadyRedeemed' | 'nothingToReset' | 'noCredit';
+export type ConsumeAiBotResetRequest = { instanceID: string; idempotencyKey: string; creditId?: string };
+
+export interface CodexWeeklyLimit {
+  resetCredits?: CodexResetCredits | null;
+  // null: provider explicitly reports no short window; undefined: data unavailable.
+  shortTerm?: { remainingPercent: number; resetsAt: number | null } | null;
+  remainingPercent: number;
+  resetsAt: number | null;
+  checkedAt: number;
+}

@@ -1,0 +1,25 @@
+@mixin text-overflow($lines) {
+  @content;
+  display: -webkit-box;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+}
+
+// Resolve the same source files as helpers/images through Webpack's asset pipeline.
+@function getImagePathByID($type, $id) {
+  @return url('~@/assets/images/#{$type}/#{$id}.webp');
+}
+
+@function getIconPathByName($name) {
+  @return url('~@/assets/icons/#{$name}.webp');
+}
+
+@function getThumbnailPathByID($type, $id) {
+  @return url('~@/assets/thumbnails/#{$type}/#{$id}.webp');
+}
+
+@function getAvatarPathByID($type, $id) {
+  @return url('~@/assets/avatars/#{$type}/#{$id}.webp');
+}

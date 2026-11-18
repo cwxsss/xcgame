@@ -1,0 +1,41 @@
+import { index, prop, modelOptions, Severity } from '@typegoose/typegoose';
+import type { TRoles } from '../game/roles';
+
+/**
+ * Mongoose model for RoleRating
+ */
+@modelOptions({
+  schemaOptions: {
+    timestamps: true,
+  },
+  options: {
+    allowMixed: Severity.ALLOW,
+  },
+})
+@index({ role: 1, rank: 1 })
+@index({ userID: 1 })
+export class RoleRating {
+  @prop({ required: true })
+  userID!: string;
+
+  @prop({ required: true })
+  role!: TRoles;
+
+  @prop({ required: true })
+  winrate!: number;
+
+  @prop({ required: true })
+  gamesCount!: number;
+
+  @prop({ required: true })
+  rating!: number;
+
+  @prop({ required: true })
+  rank!: number;
+
+  @prop({ type: Date })
+  lastPlayedAt?: Date;
+
+  @prop({ type: Date, default: Date.now })
+  updatedAt!: Date;
+}

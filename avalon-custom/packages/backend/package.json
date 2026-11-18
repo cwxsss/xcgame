@@ -1,0 +1,42 @@
+{
+  "name": "@avalon/backend",
+  "version": "75.12.4",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "test": "jest --detectOpenHandles --colors",
+    "start": "npx ts-node ./src/index.ts",
+    "dev": "cross-env NODE_ENV=development npx nodemon",
+    "init-achievements": "npx ts-node ./src/scripts/initAchievements.ts"
+  },
+  "keywords": [],
+  "author": "@Razdva122",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.2",
+    "livekit-server-sdk": "2.19.1",
+    "mongoose": "~9.9.5",
+    "nodemailer": "^10.0.10",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
+    "ts-trueskill": "3.3.0",
+    "ws": "8.21.3",
+    "proxy-addr": "^2.0.7",
+    "@typegoose/typegoose": "~13.5.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.6",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/nodemailer": "^8.0.2",
+    "@types/ws": "8.18.1",
+    "mongodb-memory-server-core": "^11.2.0",
+    "@types/proxy-addr": "^2.0.3"
+  }
+}

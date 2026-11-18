@@ -1,0 +1,75 @@
+/**
+ * Room-related translations for Portuguese language
+ * This file contains translations for room and main page
+ */
+export default {
+  room: {
+    errorNotFound: 'Este UUID está incorreto',
+    backToLobby: 'Voltar ao lobby',
+    restartGame: 'Reiniciar jogo',
+  },
+  mainPage: {
+    newPlayerTitle: 'O que é o jogo de tabuleiro Avalon?',
+    rulesLink: 'Como jogar Avalon',
+    gameplaySummary:
+      'Avalon é um jogo de tabuleiro de dedução social com papéis secretos. Discutam em quem confiar, votem nas equipes das missões e mantenham suas identidades em segredo. O Bem tenta completar três missões; o Mal tenta sabotá-las ou descobrir quem é Merlin.',
+    guideTitle: 'Como começar uma partida com amigos',
+    guideCreate: 'Reúna 5–10 jogadores. Digite um apelido e crie uma sala.',
+    guideInvite: 'Compartilhe o link da sala. Seus amigos podem entrar com um apelido.',
+    guideStart:
+      'Escolha os papéis e as expansões nas configurações da sala. Quando todos entrarem, o anfitrião bloqueia a entrada de jogadores e inicia a partida.',
+    guide: {
+      costTitle: 'É grátis?',
+      costText: 'Jogar Avalon com amigos é grátis.',
+      devicesTitle: 'De quais dispositivos precisamos?',
+      devicesText:
+        'Abra avalon-game.com no navegador de um celular, tablet ou computador. Não é necessário instalar um aplicativo. Cada jogador usa sua própria tela para manter seu papel em segredo.',
+      conversationTitle: 'Como conversar durante a partida?',
+      conversationText:
+        'Use o chat de voz integrado ou o chat de texto da sala. Se preferir, você pode usar uma plataforma externa, como o Discord. Se estiverem juntos pessoalmente, conversem em voz alta e ative a opção de ocultar spoilers para esconder informações privadas na tela.',
+      featuresTitle: 'Quais papéis e expansões estão disponíveis?',
+      featuresText:
+        'Escolha papéis clássicos como Merlin, Percival, Morgana, Mordred e Oberon, ou experimente papéis adicionais como os Amantes e a Bruxa. A Dama do Lago e Excalibur oferecem mais opções. O histórico permite rever ações anteriores, exceto quando a sala usa o histórico oculto.',
+    },
+    socialTitle: 'Avalon está nas redes sociais',
+    socialDescription: 'Siga-nos para ver memes e momentos da Távola Redonda.',
+
+    retryAi: 'Tentar novamente',
+    showMore: 'Ver mais jogos',
+    heroCaption: 'Confiança. Blefe. Avalon.',
+    filterLabel: 'Filtrar jogos',
+    filterall: 'Todos',
+    filteropen: 'Abertos',
+    filterplaying: 'Em jogo',
+    filterfinished: 'Encerrados',
+    noMatchingRooms: 'Ainda não há jogos nesta categoria.',
+    showAll: 'Ver todos os jogos',
+    findPlayers: 'Encontre seu grupo',
+    discordHint: 'Converse e encontre jogadores no Discord',
+    leaderboard: 'Ver classificação',
+    finished: 'Encerrado',
+    starting: 'Iniciando',
+    inProgress: 'Em andamento',
+    full: 'Sala cheia',
+    waiting: 'Aguardando jogadores',
+    viewGame: 'Ver',
+
+    header: 'Jogue Avalon online',
+    intro:
+      'Jogue The Resistance: Avalon, o jogo de tabuleiro de dedução social, no navegador. Partidas com 5–10 pessoas são grátis. Também é possível jogar com bots, sozinho ou com amigos; o acesso depende do modo.',
+    createRoom: 'Criar sala',
+    watch: 'Assistir',
+    join: 'Entrar',
+    noRooms: 'Ainda não há salas. Crie uma sala e convide seus amigos.',
+    gamesList: 'Lista de jogos',
+    players: 'Jogadores',
+    loading: 'Carregando...',
+    online: 'Online: {count}',
+    lookingForPlayers: 'Procurando jogadores',
+  },
+  alert: {
+    titlediscordchat: 'Chat do Discord',
+    contentdiscordchat:
+      'Procurando jogadores para sua equipe ou quer se juntar a outros jogadores de Avalon? Use nosso <b><a href="https://discord.gg/Xdu7ByqQtt" target="_blank">chat&nbsp;do&nbsp;Discord</a></b>!',
+  },
+};

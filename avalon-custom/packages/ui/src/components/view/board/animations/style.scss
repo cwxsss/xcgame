@@ -1,0 +1,699 @@
+.avalon-assassination {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 380px;
+  height: 290px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.avalon-cards-scene {
+  position: absolute;
+  inset: 0;
+  width: 380px;
+  height: 290px;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #302419;
+  perspective: 800px;
+  transform: rotateX(12deg);
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+.avalon-cards-target,
+.avalon-cards-halves {
+  position: absolute;
+  left: 126px;
+  top: 43px;
+  width: 128px;
+  height: 186px;
+  transform-style: preserve-3d;
+  transform: rotate(-5deg);
+  z-index: 3;
+}
+
+.avalon-cards-card {
+  width: 128px;
+  height: 186px;
+  position: relative;
+  border-radius: 8px;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 2px 0 #665541,
+    0 4px 0 #b09970,
+    0 7px 5px #09060366,
+    5px 13px 16px #0009;
+}
+
+.avalon-cards-turn {
+  transform-origin: center;
+  backface-visibility: visible;
+}
+
+.avalon-cards-back,
+.avalon-cards-front,
+.avalon-cards-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.avalon-cards-back,
+.avalon-cards-front {
+  backface-visibility: hidden;
+}
+.avalon-cards-front {
+  opacity: 0;
+}
+
+.avalon-cards-face {
+  background: radial-gradient(ellipse at 30% 5%, #f6e7be, #d0b789);
+  border: 1px solid #dac495;
+  box-shadow:
+    inset 0 0 0 4px #695437,
+    inset 0 0 0 5px #d6bb80,
+    inset 0 0 22px #6a421b35;
+}
+
+.avalon-cards-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, #58371706 0px, #58371706 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at top left, #fff4 0%, transparent 65%);
+  mix-blend-mode: multiply;
+}
+
+.avalon-cards-art {
+  position: absolute;
+  inset: 9px;
+  overflow: hidden;
+  border: 1px solid #654b2c;
+  border-radius: 3px 3px 1px 1px;
+  background: #202014;
+  box-shadow: inset 0 0 14px #0008;
+}
+
+.avalon-cards-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: sepia(0.12) saturate(0.72);
+}
+.avalon-cards-title {
+  position: absolute;
+  font-weight: bold;
+  font-size: 13px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: #f3e4c0;
+  text-shadow: 0 1px 3px #000;
+}
+.avalon-cards-caption {
+  top: 216px;
+  left: -20px;
+  width: 168px;
+  opacity: 0;
+}
+.avalon-cards-selected-caption,
+.avalon-cards-survivor-caption {
+  top: 258px;
+}
+.avalon-cards-selected-caption {
+  left: 106px;
+}
+.avalon-cards-survivor-caption {
+  left: 200px;
+}
+
+.avalon-cards-back {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 9px, #a68a4920 10px 11px, transparent 12px 20px),
+    repeating-linear-gradient(-45deg, transparent 0 9px, #a68a4920 10px 11px, transparent 12px 20px),
+    radial-gradient(ellipse, #302e25, #101c1b);
+  border: 1px solid #c4a775;
+  box-shadow:
+    inset 0 0 0 4px #152321,
+    inset 0 0 0 5px #a6925a80,
+    inset 0 0 24px #0009;
+  color: #ccb77f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.avalon-cards-back span {
+  font-size: 24px;
+  font-style: italic;
+  text-shadow: 0 1px #000;
+  z-index: 1;
+}
+.avalon-cards-back-ornament {
+  position: absolute;
+  width: 76px;
+  height: 104px;
+  border: 1px solid #9b8645;
+  border-radius: 44%;
+  box-shadow:
+    0 0 0 5px #bc9f3e15,
+    inset 0 0 0 5px #bc9f3e15;
+  transform: rotate(45deg);
+}
+.avalon-cards-table-shadow {
+  position: absolute;
+  left: 122px;
+  top: 215px;
+  width: 147px;
+  height: 24px;
+  border-radius: 50%;
+  background: #0009;
+  filter: blur(11px);
+  z-index: 0;
+}
+.avalon-cards-halves {
+  z-index: 4;
+  opacity: 0;
+}
+.avalon-cards-half {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(3px 6px 3px #0008);
+  transform-origin: 50% 87%;
+  height: 186px;
+}
+.avalon-cards-half-left {
+  clip-path: polygon(
+    0 0,
+    52% 0,
+    49% 9%,
+    54% 16%,
+    49% 27%,
+    53% 36%,
+    48% 44%,
+    53% 56%,
+    47% 64%,
+    51% 78%,
+    48% 91%,
+    52% 100%,
+    0 100%
+  );
+}
+.avalon-cards-half-right {
+  clip-path: polygon(
+    52% 0,
+    100% 0,
+    100% 100%,
+    52% 100%,
+    48% 91%,
+    51% 78%,
+    47% 64%,
+    53% 56%,
+    48% 44%,
+    53% 36%,
+    49% 27%,
+    54% 16%,
+    49% 9%
+  );
+}
+.avalon-cards-half .avalon-cards-face {
+  filter: saturate(0.45) brightness(0.9);
+}
+
+.avalon-cards-side {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  backface-visibility: hidden;
+  // Flatten each clipped side as one surface to keep its opposite face hidden.
+  transform-style: flat;
+  overflow: visible;
+}
+
+.avalon-cards-survivor {
+  position: absolute;
+  left: 220px;
+  top: 43px;
+  z-index: 5;
+  opacity: 0;
+  transform: translateX(190px) rotate(11deg);
+}
+
+.avalon-assassination-reduced .avalon-cards-caption {
+  opacity: 1;
+}
+.avalon-assassination-reduced.avalon-assassination-miss .avalon-cards-selected-caption {
+  transform: translateX(-84px);
+}
+.avalon-assassination-reduced .avalon-cards-target {
+  display: none;
+}
+.avalon-assassination-reduced .avalon-cards-halves {
+  opacity: 1;
+}
+.avalon-assassination-reduced .avalon-cards-half-left {
+  transform: translate(-12px, 4px) rotate(-9deg);
+}
+.avalon-assassination-reduced .avalon-cards-half-right {
+  transform: translate(13px, 10px) rotate(10deg);
+}
+.avalon-assassination-reduced .avalon-cards-survivor {
+  opacity: 1;
+  transform: rotate(3deg);
+}
+.avalon-assassination-reduced.avalon-assassination-miss .avalon-cards-halves {
+  transform: translateX(-84px) rotate(-5deg);
+}
+.avalon-assassination-reduced.avalon-assassination-miss .avalon-cards-table-shadow {
+  transform: translateX(-84px);
+}
+
+.avalon-loyalty-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+  isolation: isolate;
+}
+.avalon-loyalty-emblem {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 35% 18%, #d2b782, #857152 65%, #4a4439);
+  border: 1px solid #cbb582;
+  box-shadow:
+    0 1px 0 #c9ae75,
+    0 3px 0 #625746,
+    0 4px 0 #2b2922,
+    3px 7px 9px #0008;
+  transform-origin: center;
+  transform-style: preserve-3d;
+  opacity: 0;
+  z-index: 4;
+  overflow: hidden;
+}
+.avalon-loyalty-emblem > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  filter: saturate(0.95);
+  border-radius: 50%;
+}
+.avalon-loyalty-emblem::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid #fff2;
+  box-shadow:
+    inset 0 1px 2px #fff4,
+    inset 0 -2px 2px #0007;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.avalon-loyalty-sheen {
+  position: absolute;
+  inset: -15%;
+  width: 100%;
+  height: 130%;
+  background: linear-gradient(100deg, transparent 34%, #fff3db 48%, transparent 63%);
+  opacity: 0;
+  pointer-events: none;
+}
+.avalon-loyalty-source-rim,
+.avalon-loyalty-target-rim {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid #c7ad72;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px #0005;
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.avalon-loyalty-target-rim {
+  border-color: #d0bc8b;
+  border-width: 2px;
+}
+.avalon-loyalty-source-mark {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 50%;
+  padding: 1px;
+  overflow: hidden;
+  background: #b6a074;
+  border: 1px solid #d1ba83;
+  box-shadow: 1px 2px 3px #0009;
+  z-index: 3;
+  opacity: 0;
+}
+.avalon-loyalty-source-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 54% 31%;
+  filter: saturate(0.7);
+}
+
+.avalon-pair-slot {
+  position: absolute;
+  top: 43px;
+  left: 36px;
+  width: 128px;
+  height: 186px;
+  transform: rotate(-5deg);
+}
+.avalon-pair-slot-1 {
+  left: 210px;
+  transform: rotate(5deg);
+}
+.avalon-pair-single .avalon-pair-slot {
+  left: 126px;
+}
+.avalon-pair-turn {
+  position: absolute;
+  inset: 0;
+}
+.avalon-pair-back,
+.avalon-pair-front,
+.avalon-pair-halves,
+.avalon-pair-half-left,
+.avalon-pair-half-right {
+  position: absolute;
+  inset: 0;
+}
+.avalon-pair-front,
+.avalon-pair-halves {
+  opacity: 0;
+}
+.avalon-pair-half-left,
+.avalon-pair-half-right {
+  filter: drop-shadow(3px 6px 3px #0008);
+}
+.avalon-pair-stamp {
+  position: absolute;
+  left: 15px;
+  top: 56px;
+  width: 98px;
+  text-align: center;
+  padding: 8px 4px;
+  background: #572e28eb;
+  color: #f0c5b0;
+  border: 1px solid #bd8763;
+  font:
+    17px Georgia,
+    'Times New Roman',
+    serif;
+  transform: rotate(-12deg);
+  opacity: 0;
+  z-index: 8;
+}
+.avalon-pair-miss {
+  background: #274334eb;
+  color: #c5e8b8;
+}
+.avalon-pair-protected {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid #b8d4a5;
+  border-radius: 11px;
+  box-shadow: 0 0 17px #93b98355;
+  opacity: 0;
+}
+.avalon-pair-slash {
+  position: absolute;
+  top: 130px;
+  left: 22px;
+  width: 330px;
+  height: 2px;
+  background: #ffe2ac;
+  box-shadow: 0 0 12px #efaa63;
+  transform: rotate(-14deg);
+  opacity: 0;
+  z-index: 6;
+}
+.avalon-pair-reduced {
+  .avalon-pair-back {
+    opacity: 0;
+  }
+  .avalon-cards-caption,
+  .avalon-pair-front,
+  .avalon-pair-stamp,
+  .avalon-pair-protected {
+    opacity: 1;
+  }
+  .avalon-pair-cut .avalon-pair-turn {
+    opacity: 0;
+  }
+  .avalon-pair-halves {
+    opacity: 1;
+  }
+  .avalon-pair-half-left {
+    transform: translate(-13px, 5px) rotate(-9deg);
+  }
+  .avalon-pair-half-right {
+    transform: translate(13px, 12px) rotate(9deg);
+  }
+}
+
+.avalon-mission-scene {
+  position: absolute;
+  width: 360px;
+  height: 240px;
+  left: 120px;
+  top: 250px;
+  .avalon-mission-card {
+    position: absolute;
+    z-index: 2;
+    top: 66px;
+    width: 74px;
+    height: 112px;
+    transform-origin: top center;
+  }
+  .turn,
+  .back,
+  .face {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+  }
+  .turn {
+    box-shadow: 4px 8px 10px #0007;
+  }
+  .back {
+    display: grid;
+    place-items: center;
+    color: #d3b87e;
+    font:
+      18px Georgia,
+      serif;
+    background: #24382c;
+    border: 2px double #b69d6e;
+  }
+  .face {
+    opacity: 0;
+    background: radial-gradient(ellipse at top, #f1e2bb, #c4ae84);
+    border: 1px solid #b69d6e;
+  }
+  .face img {
+    position: absolute;
+    top: 11px;
+    left: 11px;
+    width: 50px;
+    height: 64px;
+    object-fit: contain;
+  }
+  .face strong {
+    position: absolute;
+    bottom: 11px;
+    width: 100%;
+    text-align: center;
+    color: #352a1a;
+    font:
+      bold 11px Georgia,
+      serif;
+  }
+  .bad .face {
+    background: radial-gradient(ellipse at top, #dfc8ac, #b29677);
+  }
+  .avalon-mission-badge {
+    position: absolute;
+    z-index: 1;
+    left: 156px;
+    top: 200px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid #d5bb7e;
+    background: radial-gradient(ellipse at top, #b69e68, #302e1e);
+    box-shadow:
+      0 0 0 7px #c7ae6222,
+      0 10px 15px #0007;
+    opacity: 0;
+  }
+  .avalon-mission-badge img {
+    position: absolute;
+    inset: 5px;
+    width: 34px;
+    height: 34px;
+  }
+  &.reduced {
+    .back {
+      opacity: 0;
+    }
+    .face {
+      opacity: 1;
+    }
+  }
+}
+
+.avalon-mission-scene.witch-hidden {
+  .mission-rim {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid #b799ce;
+    border-radius: 9px;
+    opacity: 0;
+    box-shadow:
+      0 0 14px #b799ce66,
+      inset 0 0 12px #b799ce33;
+  }
+  .avalon-mission-badge {
+    border-color: #b8a1c6;
+    background: radial-gradient(ellipse at top, #6a5875, #2e2339);
+    box-shadow:
+      0 0 0 7px #b799ce22,
+      0 10px 15px #0007;
+  }
+  .avalon-mission-badge img {
+    inset: 0;
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 50%;
+    filter: saturate(0.65);
+  }
+  &.reduced {
+    .back {
+      opacity: 1;
+    }
+    .mission-rim {
+      opacity: 0.25;
+    }
+  }
+}
+
+.avalon-excalibur-scene {
+  & {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .ex-arc {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .ex-arc path {
+    fill: none;
+    stroke: #f0d798;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  .ex-trail {
+    stroke-width: 2;
+  }
+  .ex-trail-glow {
+    stroke-width: 9;
+    opacity: 0.4;
+    filter: blur(5px);
+  }
+  .ex-spark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff3ce;
+    box-shadow:
+      0 0 6px 3px #eccc87,
+      0 0 22px 7px #eccc8766;
+    opacity: 0;
+    offset-anchor: center;
+  }
+  .ex-owner-badge,
+  .ex-change {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d2b579;
+    border-radius: 50%;
+    background: #27362c;
+    box-shadow: 0 2px 5px #0009;
+  }
+  .ex-owner-badge svg {
+    width: 30px;
+    height: 30px;
+    margin: 1px;
+  }
+  .ex-change {
+    opacity: 0;
+    color: #f2db9c;
+    font: 28px/31px Georgia;
+    text-align: center;
+  }
+  .ex-target-ring {
+    position: absolute;
+    width: 108px;
+    height: 108px;
+    border: 2px solid #eed28f;
+    border-radius: 50%;
+    box-shadow:
+      0 0 13px 4px #e6c57888,
+      inset 0 0 12px #e6c57866;
+    opacity: 0;
+  }
+  .ex-owner-badge {
+    width: 44px;
+    height: 52px;
+    border-radius: 12px;
+    background: radial-gradient(ellipse at top, #344a43, #182920);
+    border-color: #bda372;
+    box-shadow:
+      0 0 0 2px #182820,
+      0 3px 7px #0009;
+  }
+  .ex-owner-badge svg {
+    width: 36px;
+    height: 48px;
+    margin: 1px 3px;
+    filter: drop-shadow(0 1px 1px #0009);
+  }
+
+  &.reduced-use .ex-change {
+    opacity: 1;
+  }
+}

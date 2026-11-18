@@ -1,0 +1,33 @@
+import { io } from 'socket.io-client';
+import { readStoredObject } from '@/store/init';
+
+import type { Dictionary, Socket } from '@avalon/types';
+
+import { socketPath, socketURL } from '@/api/const';
+
+function getAuthToken(): string | undefined {
+  const userProfileInStorage = readStoredObject(userProfilePath);
+  const profile = userProfileInStorage ? JSON.parse(userProfileInStorage) : null;
+
+  return profile?.token;
+}
+
+import { userProfilePath } from '@/store/const';
+
+export const socket: Socket = io(socketURL, {
+  path: socketPath,
+  withCredentials: true,
+  // Start after mounting, once listeners are installed; never connect during prerender.
+  autoConnect: false,
+  auth: {
+    token: getAuthToken(),
+  },
+});
+
+export const updateAuthToken = () => {
+  (<Dictionary<string | undefined>>socket.auth).token = getAuthToken();
+
+  // @ts-expect-error acks is private
+  socket.acks = {};
+  socket.disconnect().connect();
+};

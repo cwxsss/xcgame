@@ -1,0 +1,98 @@
+import { aiRosterInfo } from '@avalon/types';
+import { AiRepository } from './repository';
+import type { Db } from 'mongodb';
+import type { StartedRoomState, TRoomInfo } from '@avalon/types';
+
+test('lobby summaries use a projection, share concurrent reads, expire, and invalidate on save', async () => {
+  let reads = 0;
+  const projections: unknown[] = [];
+  const indexes: unknown[] = [];
+  let status = 'finished';
+  const collection = {
+    createIndex: async (index: unknown) => {
+      indexes.push(index);
+    },
+    updateOne: async () => ({}),
+    find: (_query: unknown, options: { projection: unknown }) => {
+      reads++;
+      projections.push(options.projection);
+      return {
+        sort: () => ({
+          limit: () => ({
+            toArray: async () => [
+              {
+                state: {
+                  roomID: 'room',
+                  ai: { status, model: 'model', beginner: true, botDifficulty: 'regular' },
+                  stage: 'started',
+                  leaderID: 'host',
+                  players: [{ id: 'bot' }],
+                  options: {},
+                  createAt: '2026-09-27',
+                  game: { result: { winner: 'good' } },
+                },
+              },
+            ],
+          }),
+        }),
+      };
+    },
+  };
+  const now = jest.spyOn(Date, 'now').mockReturnValue(1000);
+  try {
+    const repo = new AiRepository({ collection: () => collection } as unknown as Db) as AiRepository & {
+      recentSummaries(): Promise<TRoomInfo[]>;
+    };
+    const results = await Promise.all(Array.from({ length: 12 }, () => repo.recentSummaries()));
+    expect(reads).toBe(1);
+    expect(results[0][0]).toMatchObject({
+      uuid: 'room',
+      aiStatus: 'finished',
+      players: 1,
+      aiBeginner: true,
+      aiBotDifficulty: 'regular',
+    });
+    expect(results[0][0]).not.toHaveProperty('game');
+    expect(projections[0]).toMatchObject({ 'state.game.result': 1 });
+    expect(projections[0]).not.toHaveProperty('state.game');
+    expect(indexes).toContainEqual({ 'state.createAt': -1 });
+    status = 'paused';
+    await repo.save({ stage: 'started', roomID: 'room', createAt: '2026-09-27T00:00:00.000Z' } as StartedRoomState);
+    expect(await repo.recentSummaries()).toEqual([]);
+    expect(reads).toBe(2);
+    now.mockReturnValue(17000);
+    await repo.recentSummaries();
+    expect(reads).toBe(3);
+    await expect(repo.load(['room'] as unknown as string)).rejects.toThrow('Invalid ID');
+  } finally {
+    now.mockRestore();
+  }
+});
+
+test('AI persistence rejects object and array IDs before touching the database', async () => {
+  const repo = new AiRepository({
+    collection: () => {
+      throw Error('database touched');
+    },
+  } as unknown as Db);
+  for (const id of [['room'], { $ne: null }, '', 'bad.id', 'x'.repeat(81)]) {
+    for (const method of ['load', 'claim', 'release', 'renewLease'] as const)
+      await expect(repo[method](id as string)).rejects.toThrow('Invalid ID');
+  }
+});
+
+test('three-human roster reserves two empty seats and releases them as friends join', () => {
+  const ai = {
+    status: 'ready' as const,
+    fallbacks: 0,
+    message: '',
+    withFriend: true,
+    humanSeats: 3 as const,
+    humanPlayerIDs: ['owner'],
+  };
+  expect(aiRosterInfo(ai, 5)).toEqual({ aiHumanCount: 1, aiOpenSeats: 2, aiBotCount: 2 });
+  ai.humanPlayerIDs.push('friend');
+  expect(aiRosterInfo(ai, 5)).toEqual({ aiHumanCount: 2, aiOpenSeats: 1, aiBotCount: 2 });
+  ai.humanPlayerIDs.push('friend2');
+  expect(aiRosterInfo(ai, 5)).toEqual({ aiHumanCount: 3, aiOpenSeats: 0, aiBotCount: 2 });
+});

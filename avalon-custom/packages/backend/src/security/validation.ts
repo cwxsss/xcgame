@@ -1,0 +1,363 @@
+import { isAiLanguage } from '@avalon/types/room/ai-language';
+import { aiHumanRoles, aiPlayerCounts, type AiPlayerCount, type AiHumanRole } from '@avalon/types';
+import { validBotQuotaThresholds } from '@/ai/quota-policy';
+import { validBotResetRequest } from '@/ai/reset-policy';
+
+export function validID(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9_-]{1,100}$/.test(value) &&
+    !['__proto__', 'prototype', 'constructor'].includes(value)
+  );
+}
+export function text(value: unknown, max = 100): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= max;
+}
+export function validName(value: unknown): value is string {
+  return (
+    text(value, 100) &&
+    value.trim().length > 0 &&
+    ![...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
+  );
+}
+export function validPassword(value: unknown): value is string {
+  return text(value, 72) && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72 && !/\s/.test(value);
+}
+export function validEmail(value: unknown): value is string {
+  return text(value, 254) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+export function validLogin(value: unknown): value is string {
+  return text(value, 100) && /^[a-zA-Z0-9_.-]+$/.test(value);
+}
+function record(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+function safeOptions(value: unknown, depth = 0, path = ''): boolean {
+  if (path === 'features.customRules.lancelotSwitchRounds') {
+    return (
+      Array.isArray(value) &&
+      value.length <= 5 &&
+      new Set(value).size === value.length &&
+      value.every((round) => Number.isInteger(round) && round >= 1 && round <= 5)
+    );
+  }
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0 && value <= 86400;
+  return (
+    depth < 4 &&
+    record(value) &&
+    Object.keys(value).length <= 40 &&
+    Object.entries(value).every(
+      ([key, item]) =>
+        /^[a-zA-Z][a-zA-Z0-9]*$/.test(key) &&
+        key !== 'constructor' &&
+        key !== 'prototype' &&
+        safeOptions(item, depth + 1, path ? path + '.' + key : key),
+    )
+  );
+}
+
+function validCustomRules(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!record(value)) return false;
+  const booleanKeys = [
+    'diceFirstLeader',
+    'leaderOnTeam',
+    'earlyAssassin',
+    'twoFailsOnRounds4And5',
+    'hideQuestCards',
+    'hideLancelotIdentities',
+  ];
+  if (!Object.keys(value).every((key) => booleanKeys.includes(key) || key === 'lancelotSwitchRounds')) return false;
+  if (!booleanKeys.every((key) => value[key] === undefined || typeof value[key] === 'boolean')) return false;
+  const rounds = value.lancelotSwitchRounds;
+  return (
+    rounds === undefined ||
+    (Array.isArray(rounds) &&
+      rounds.length <= 5 &&
+      new Set(rounds).size === rounds.length &&
+      rounds.every((round) => Number.isInteger(round) && round >= 1 && round <= 5))
+  );
+}
+
+// Required ack position is a protocol property, independent of a listener's JS arity.
+const acknowledgements: Record<string, number> = {
+  getRoomsList: 0,
+  getTotalStats: 0,
+  getAiRoomsList: 0,
+  getRolesWithRatings: 0,
+  getAllAchievements: 0,
+  getAchievementStats: 0,
+  getTrueSkillLeaderboard: 0,
+  getUserAvatars: 0,
+  getMyProfile: 0,
+  getMyStickers: 0,
+  getAiRoomAccess: 0,
+  getAiCodexModels: 0,
+  getAiCodexWeeklyLimit: 0,
+  getAiBotDashboard: 0,
+  consumeAiBotReset: 1,
+  setAiBotQuotaThresholds: 1,
+  createRoom: 0,
+  joinRoom: 1,
+  joinAiRoom: 1,
+  finishAiDiscussion: 1,
+  getOnlineCounter: 1,
+  getPlayerGames: 1,
+  getPlayerGameSummaries: 1,
+  getPlayerGameSummariesPage: 2,
+  getUserProfile: 1,
+  createGuest: 1,
+  registerUser: 1,
+  getRoleLeaderboard: 1,
+  getUserRatings: 1,
+  getPopularRoles: 1,
+  getTopPlayersForPopularRoles: 1,
+  getUserAchievements: 1,
+  getTrueSkillRating: 1,
+  getMatchTrueSkillChanges: 1,
+  resetTrueSkillRating: 1,
+  updateUserAvatar: 1,
+  getAiSpectatorRoles: 1,
+  getBeginnerReview: 1,
+  createAiRoom: 1,
+  createHumanAiRoom: 0,
+  startHumanAiRoom: 2,
+  restartHumanAiRoom: 1,
+  getLobbyAiAccess: 1,
+  startLobbyAiRoom: 2,
+  getLoyalty: 1,
+  getVoiceState: 1,
+  joinVoice: 1,
+  leaveVoice: 1,
+  login: 2,
+  updateUserPassword: 2,
+  updateUserEmail: 2,
+  updateUserLogin: 2,
+  getRatingHistory: 2,
+  updateStickerPreferences: 2,
+  sendSticker: 2,
+  controlAiRoom: 2,
+  configureAiCodex: 2,
+  getLoyaltyWithCard: 2,
+  setVoiceEnabled: 2,
+  setRoomBots: 2,
+};
+const nonIDs = new Set([
+  'createGuest',
+  'registerUser',
+  'login',
+  'updateUserPassword',
+  'updateUserEmail',
+  'updateUserLogin',
+  'updateUserName',
+  'updateUserAvatar',
+  'updateStickerPreferences',
+  'createAiRoom',
+  'createHumanAiRoom',
+  'setAiBotQuotaThresholds',
+  'getPopularRoles',
+  'getTopPlayersForPopularRoles',
+]);
+const booleanSecond = new Set([
+  'voteInRoom',
+  'useWitchAbility',
+  'useLeadToVictory',
+  'useKingReturns',
+  'useWeFoundYou',
+  'setVoiceEnabled',
+]);
+export function validPacket(event: string, args: unknown[]): boolean {
+  const ack = event === 'createHumanAiRoom' && args.length === 2 ? 1 : acknowledgements[event];
+  if (ack !== undefined && (args.length !== ack + 1 || typeof args[ack] !== 'function')) return false;
+  const values = ack !== undefined ? args.slice(0, ack) : args;
+  if (values.length > 4) return false;
+  if (event === 'setAiBotQuotaThresholds') return validBotQuotaThresholds(values[0]);
+  if (event === 'consumeAiBotReset') return validBotResetRequest(values[0]);
+  if (!nonIDs.has(event) && values.length && !validID(values[0])) return false;
+  if (event === 'getPlayerGameSummariesPage')
+    return (
+      values.length === 2 &&
+      (values[1] == null ||
+        (typeof values[1] === 'string' &&
+          (/^[a-f0-9]{24}:[a-f0-9]{24}$/.test(values[1]) ||
+            (/^avalon-(?:agent-(?:[1-9]|10)|ai-[1-7])$/.test(String(values[0])) &&
+              /^ai:[a-zA-Z0-9_-]{1,600}$/.test(values[1])))))
+    );
+  if (event === 'voteForMission' || event === 'preVote')
+    return (
+      values.length === (event === 'preVote' ? 3 : 2) &&
+      (values[1] === 'approve' || values[1] === 'reject') &&
+      (event !== 'preVote' || validID(values[2]))
+    );
+  if (event === 'discardMissionCard') return values.length === 1;
+  if (event === 'setCustomTimerPlayer') return values.length === 2 && (values[1] === null || validID(values[1]));
+  if (event === 'nextCustomTimerPlayer') return values.length === 1;
+  if (event === 'actionOnMission') return values.length === 2 && (values[1] === 'success' || values[1] === 'fail');
+  if (event === 'startCustomTimer' && values.length === 1) return true;
+  if (event === 'startCustomTimer' || event === 'addCustomTimerTime' || event === 'setCustomTimerDuration')
+    return (
+      values.length === 2 &&
+      typeof values[1] === 'number' &&
+      Number.isInteger(values[1]) &&
+      values[1] > 0 &&
+      values[1] <= 86400
+    );
+  if (event === 'createHumanAiRoom')
+    return (
+      values.length === 0 ||
+      (record(values[0]) &&
+        Object.keys(values[0]).every((key) =>
+          ['beginner', 'role', 'withFriend', 'humanSeats', 'difficulty', 'language', 'playerCount', 'playMode'].includes(key),
+        ) &&
+        typeof values[0].beginner === 'boolean' &&
+        (values[0].role === undefined ||
+          (values[0].withFriend !== true &&
+            aiHumanRoles((values[0].playerCount ?? 5) as AiPlayerCount).includes(values[0].role as AiHumanRole))) &&
+        (values[0].withFriend === undefined || typeof values[0].withFriend === 'boolean') &&
+        (values[0].humanSeats === undefined ||
+          (values[0].withFriend === true &&
+            typeof values[0].humanSeats === 'number' &&
+            Number.isInteger(values[0].humanSeats) &&
+            values[0].humanSeats >= 2 &&
+            values[0].humanSeats < ((values[0].playerCount ?? 5) as number))) &&
+        (values[0].difficulty === undefined || ['regular', 'smart'].includes(values[0].difficulty as string)) &&
+        (values[0].language === undefined || isAiLanguage(values[0].language)) &&
+        (values[0].playMode === undefined || ['classic', 'custom'].includes(values[0].playMode as string)) &&
+        (values[0].playerCount === undefined || aiPlayerCounts.includes(values[0].playerCount as AiPlayerCount)) &&
+        !(values[0].beginner && values[0].withFriend) &&
+        !(values[0].beginner && values[0].playerCount !== undefined && values[0].playerCount !== 5))
+    );
+  if (event === 'getLobbyAiAccess') return true;
+  if (event === 'startLobbyAiRoom') {
+    const options = values[1];
+    return (
+      record(options) &&
+      Object.keys(options).length >= 3 &&
+      Object.keys(options).every((key) => ['playerCount', 'language', 'humanPlayerIDs', 'playMode'].includes(key)) &&
+      aiPlayerCounts.includes(options.playerCount as AiPlayerCount) &&
+      isAiLanguage(options.language) &&
+      (options.playMode === undefined || ['classic', 'custom'].includes(options.playMode as string)) &&
+      Array.isArray(options.humanPlayerIDs) &&
+      options.humanPlayerIDs.length >= 1 &&
+      options.humanPlayerIDs.length <= 9 &&
+      options.humanPlayerIDs.every(validID) &&
+      new Set(options.humanPlayerIDs).size === options.humanPlayerIDs.length
+    );
+  }
+  if (event === 'startHumanAiRoom') {
+    const options = values[1];
+    return (
+      record(options) &&
+      Object.keys(options).every((key) => ['difficulty', 'language', 'playerCount', 'playMode'].includes(key)) &&
+      (options.playerCount === undefined || aiPlayerCounts.includes(options.playerCount as AiPlayerCount)) &&
+      typeof options.difficulty === 'string' &&
+      ['smart', 'regular'].includes(options.difficulty) &&
+      typeof options.language === 'string' &&
+      isAiLanguage(options.language) &&
+      (options.playMode === undefined || ['classic', 'custom'].includes(options.playMode as string))
+    );
+  }
+  if (event === 'createAiRoom') {
+    const options = values[0];
+    if (typeof options === 'string') return text(options, 254);
+    return (
+      record(options) &&
+      Object.keys(options).every((key) => ['model', 'language', 'playerCount'].includes(key)) &&
+      text(options.model, 254) &&
+      typeof options.language === 'string' &&
+      isAiLanguage(options.language) &&
+      (!Object.prototype.hasOwnProperty.call(options, 'playerCount') ||
+        (typeof options.playerCount === 'number' && aiPlayerCounts.includes(options.playerCount as AiPlayerCount)))
+    );
+  }
+  if (event === 'configureAiCodex') {
+    const settings = values[1];
+    return (
+      record(settings) &&
+      Object.keys(settings).length === 2 &&
+      typeof settings.model === 'string' &&
+      /^[a-zA-Z0-9._-]{1,100}$/.test(settings.model) &&
+      typeof settings.reasoning === 'string' &&
+      ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(settings.reasoning)
+    );
+  }
+  if (event === 'createGuest') return validName(values[0]) && values[0].trim().length <= 24;
+  if (event === 'startGame')
+    return values.length >= 1 && values.length <= 2 && validID(values[0]) && validCustomRules(values[1]);
+  if (event === 'setRoomBots') {
+    const bots = values[1];
+    const roles = [
+      'servant', 'minion', 'merlin', 'percival', 'merlinPure', 'tristan', 'isolde', 'goodLancelot', 'guinevere',
+      'troublemaker', 'cleric', 'morgana', 'oberon', 'mordred', 'evilLancelot', 'trickster', 'lunatic', 'brute',
+      'witch', 'revealer', 'wraith', 'assassin',
+    ];
+    return (
+      values.length === 2 && validID(values[0]) && Array.isArray(bots) && bots.length <= 9 &&
+      bots.every((bot) => record(bot) && Object.keys(bot).every((key) => key === 'role') &&
+        (bot.role === undefined || (typeof bot.role === 'string' && roles.includes(bot.role))))
+    );
+  }
+  if (event === 'registerUser') {
+    const user = values[0];
+    return (
+      record(user) &&
+      validID(user.id) &&
+      validName(user.name) &&
+      validEmail(user.email) &&
+      validLogin(user.login) &&
+      validPassword(user.password)
+    );
+  }
+  if (event === 'updateOptions') {
+    const options = values[1];
+    return (
+      values.length === 2 &&
+      record(options) &&
+      record(options.roles) &&
+      record(options.addons) &&
+      record(options.features) &&
+      !(options.addons.trapper && options.addons.plotCards) &&
+      Object.values(options.roles).every((n) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 10) &&
+      safeOptions(options)
+    );
+  }
+  if (event === 'updateStickerPreferences') {
+    return (
+      Array.isArray(values[0]) && values[0].length <= 12 && values[0].every(validID) && typeof values[1] === 'boolean'
+    );
+  }
+  if (event === 'sendMessage')
+    return (
+      values.length >= 2 &&
+      values.length <= 4 &&
+      text(values[1], 2000) &&
+      (values[2] === undefined || text(values[2], 100)) &&
+      (values[3] === undefined || typeof values[3] === 'function')
+    );
+  if (event === 'updateUserAvatar') return text(values[0], 100) && /^[a-zA-Z0-9_/-]+$/.test(values[0]);
+  if (event === 'login') return text(values[0], 254) && text(values[1], 1024);
+  if (event === 'updateUserPassword') return text(values[0], 1024) && validPassword(values[1]);
+  if (event === 'updateUserEmail') return text(values[0], 1024) && validEmail(values[1]);
+  if (event === 'updateUserLogin') return text(values[0], 1024) && validLogin(values[1]);
+  if (event === 'updateUserName')
+    return (
+      values.length >= 1 &&
+      values.length <= 2 &&
+      validName(values[0]) &&
+      (values[1] === undefined || typeof values[1] === 'function')
+    );
+  if (booleanSecond.has(event) && typeof values[1] !== 'boolean') return false;
+  return values.every(
+    (v) =>
+      v === undefined ||
+      text(v, 254) ||
+      typeof v === 'boolean' ||
+      (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 86400),
+  );
+}

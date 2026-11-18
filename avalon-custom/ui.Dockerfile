@@ -1,0 +1,35 @@
+FROM --platform=${BUILDPLATFORM} ghcr.io/puppeteer/puppeteer:25.12.0@sha256:60ad89b1d8ca14877120250b9c96694dd19a4eda5890fdbad64f4740c6a27361 AS build-stage
+
+ARG APP_DIR=/home/pptruser/app
+RUN mkdir -p ${APP_DIR}
+WORKDIR ${APP_DIR}
+
+RUN chown pptruser:pptruser ${APP_DIR}
+
+COPY --chown=pptruser:pptruser package*.json ${APP_DIR}/
+COPY --chown=pptruser:pptruser packages/ui/package.json ${APP_DIR}/packages/ui/
+COPY --chown=pptruser:pptruser packages/types/package.json ${APP_DIR}/packages/types/
+COPY --chown=pptruser:pptruser packages/backend/package.json ${APP_DIR}/packages/backend/
+
+USER pptruser
+RUN npm ci
+
+COPY --chown=pptruser:pptruser . .
+RUN node --test .github/tests/*.test.cjs && AVALON_BUNDLE_BUDGET=report AVALON_BUILD_CONTAINER=1 npm run build:ui
+
+# Export the exact audited build with images for packaging in CI.
+FROM scratch AS release-artifact
+COPY --from=build-stage /home/pptruser/app/packages/ui/dist /
+
+FROM --platform=${BUILDPLATFORM} nginx AS production-stage
+RUN mkdir /app
+COPY --from=build-stage /home/pptruser/app/packages/ui/dist /app
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Retain mounted voice configuration while supplying missing application routes.
+COPY deploy/nginx/board-route.awk /usr/local/share/avalon/board-route.awk
+COPY deploy/nginx/agent-readiness.awk /usr/local/share/avalon/agent-readiness.awk
+COPY deploy/nginx/entrypoint.sh /usr/local/bin/avalon-nginx-entrypoint
+RUN chmod +x /usr/local/bin/avalon-nginx-entrypoint
+ENTRYPOINT ["/usr/local/bin/avalon-nginx-entrypoint"]
+CMD ["nginx", "-g", "daemon off;"]

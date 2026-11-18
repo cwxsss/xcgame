@@ -1,0 +1,127 @@
+const assert = require('node:assert/strict');
+const { test } = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
+
+// Test the actual HTML delivered to crawlers, without executing JavaScript.
+const dist = path.resolve(__dirname, '../dist');
+function graphAt(route) {
+  const html = fs.readFileSync(path.join(dist, route, 'index.html'), 'utf8');
+  const documents = [...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .filter((match) => match[1].trim())
+    .map((match) => JSON.parse(match[1]));
+  return documents.flatMap((doc) => doc['@graph'] || [doc]);
+}
+
+test('home describes the website and free browser game with stable linked identities', () => {
+  const graph = graphAt('/');
+  const site = graph.find((node) => node['@type'] === 'WebSite');
+  assert(site, 'Missing WebSite in delivered HTML');
+  assert.equal(site['@id'], 'https://avalon-game.com/#website');
+  const organization = graph.find((node) => node['@type'] === 'Organization');
+  assert(organization, 'Missing project Organization in delivered HTML');
+  assert.equal(organization['@id'], 'https://avalon-game.com/#organization');
+  assert.equal(organization.url, 'https://avalon-game.com/');
+  assert.equal(site.publisher['@id'], organization['@id']);
+  const game = graph.find((node) => node['@type'] === 'WebApplication');
+  assert(game, 'Missing WebApplication in delivered HTML');
+  assert.equal(game['@id'], 'https://avalon-game.com/#game');
+  assert.equal(game.isAccessibleForFree, true);
+  assert.equal(game.applicationCategory, 'GameApplication');
+  const page = graph.find((node) => node['@type'] === 'WebPage');
+  assert.equal(page.mainEntity['@id'], game['@id']);
+  assert.equal(page.isPartOf['@id'], site['@id']);
+});
+
+test('localized rules describe their own URL and language while retaining breadcrumbs', () => {
+  const graph = graphAt('/ru/wiki/rules/');
+  const page = graph.find((node) => node['@type'] === 'WebPage');
+  assert(page, 'Missing localized WebPage in delivered HTML');
+  assert.equal(page.url, 'https://avalon-game.com/ru/wiki/rules/');
+  assert.equal(page.inLanguage, 'ru');
+  assert.match(page.name, /[А-Яа-я]/);
+  assert.equal(page.about['@id'], 'https://avalon-game.com/#game');
+  const breadcrumbs = graph.find((node) => node['@type'] === 'BreadcrumbList');
+  assert(breadcrumbs, 'Breadcrumbs must coexist with page data');
+  assert.equal(page.breadcrumb['@id'], breadcrumbs['@id']);
+  assert.equal(breadcrumbs.itemListElement.at(-1).item, page.url);
+});
+
+test('404 page does not describe itself as an indexable public page or game', () => {
+  assert.equal(graphAt('/404/').length, 0);
+});
+
+test('all guide locales describe their canonical page and link localized breadcrumbs to existing public pages', () => {
+  for (const { route, language, prefix } of [
+    '/guides/social-deduction-games-online/',
+    '/guides/games-like-secret-hitler/',
+    '/guides/avalon-vs-werewolf/',
+  ].flatMap((path) =>
+    [
+      ['en', ''],
+      ['ru', '/ru'],
+      ['es', '/es'],
+      ['pt', '/pt'],
+      ['vi', '/vi'],
+      ['zh-CN', '/zh-cn'],
+      ['zh-TW', '/zh-tw'],
+    ].map(([language, prefix]) => ({ route: prefix + path, language, prefix })),
+  )) {
+    const graph = graphAt(route);
+    const page = graph.find((node) => node['@type'] === 'WebPage');
+    assert.equal(page.url, 'https://avalon-game.com' + route);
+    assert.equal(page.inLanguage, language);
+    const crumbs = graph.find((node) => node['@type'] === 'BreadcrumbList');
+    assert.equal(page.breadcrumb['@id'], crumbs['@id']);
+    assert.equal(crumbs.itemListElement[0].item, 'https://avalon-game.com' + prefix + '/');
+    assert.equal(crumbs.itemListElement.at(-1).item, page.url);
+    assert.equal(crumbs.itemListElement.length, route.includes('social-deduction-games-online') ? 2 : 3);
+    for (const item of crumbs.itemListElement) {
+      assert(fs.existsSync(path.join(dist, new URL(item.item).pathname, 'index.html')));
+    }
+  }
+});
+
+test('support and community deliver localized public content and structured data without private account data', () => {
+  const { routesSeo } = require('../src/router/seo');
+  const { localizedPath } = require('../src/router/paths');
+  const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
+  for (const name of ['support', 'community']) {
+    for (const [lang, meta] of Object.entries(routesSeo[name].meta.multiLanguage)) {
+      const route = localizedPath(`/${name}/`, lang);
+      const html = fs.readFileSync(path.join(dist, route, 'index.html'), 'utf8');
+      assert(html.includes(`<title>${meta.title}</title>`), route);
+      assert.match(html, new RegExp(`class="${name}-page(?:[ "][^>]*)`), route);
+      assert.match(html, /<h1\b[^>]*>[^<]+<\/h1>/, route);
+      assert.match(html, /name="robots" content="index, follow"/, route);
+      assert(sitemap.includes(`<loc>https://avalon-game.com${route}</loc>`), route);
+      const page = graphAt(route).find((node) => node['@type'] === 'WebPage');
+      assert.equal(page.url, `https://avalon-game.com${route}`);
+      assert.equal(page.inLanguage, lang);
+      if (name === 'support') {
+        assert.doesNotMatch(html, /class="support-panel account"|id="support-txid"|class="orders"/);
+      }
+    }
+  }
+});
+
+test('both board landing pages deliver crawlable localized HTML, distinct metadata and breadcrumbs', () => {
+  const { routesSeo } = require('../src/router/seo');
+  const { localizedPath } = require('../src/router/paths');
+  const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
+  for (const name of ['community_solo', 'community_group']) {
+    const entry = routesSeo[name];
+    for (const [language, meta] of Object.entries(entry.meta.multiLanguage)) {
+      const route = localizedPath(entry.path, language);
+      const html = fs.readFileSync(path.join(dist, route, 'index.html'), 'utf8');
+      assert(html.includes(`<title>${meta.title}</title>`));
+      assert.equal((html.match(/<h1[ >]/g) || []).length, 1);
+      assert(html.includes('discovery-guide'));
+      assert(html.includes(`href="${localizedPath('/community/players/', language)}"`));
+      assert(html.includes(`href="${localizedPath('/community/groups/', language)}"`));
+      assert(sitemap.includes('https://avalon-game.com' + route));
+      assert.equal(graphAt(route).find((item) => item['@type'] === 'BreadcrumbList').itemListElement.length, 3);
+      assert.doesNotMatch(html, /demo_avalon_|demo-board-|class="board-form"/);
+    }
+  }
+});

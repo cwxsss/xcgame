@@ -1,0 +1,80 @@
+<template>
+  <div class="info-page-content wiki-page">
+    <WikiBreadCrumbs />
+    <h1>
+      <div class="evil-loyalty-icon"></div>
+      {{ $t('roles.mordred') }} {{ $t('roles.role') }}
+    </h1>
+
+    <WikiRoleGuide role="mordred" />
+
+    <h2>{{ $t('mordred.generalInformation') }}</h2>
+    <p>
+      <LocalizedTextWrapper keypath="mordred.playingAsMordred" />
+    </p>
+
+    <TopRolePlayer role="mordred" class="my-4" />
+
+    <h2>{{ $t('mordred.generalTips') }}</h2>
+    <ul>
+      <li>
+        <strong>{{ $t('mordred.hiddenIdentity') }}</strong
+        ><LocalizedTextWrapper keypath="mordred.hiddenIdentityContent" />
+      </li>
+      <li>
+        <strong>{{ $t('mordred.distrust') }}</strong> {{ $t('mordred.distrustContent') }}
+      </li>
+      <li>
+        <strong>{{ $t('mordred.coordinateMinions') }}</strong> {{ $t('mordred.coordinateMinionsContent') }}
+      </li>
+      <li>
+        <strong>{{ $t('mordred.leadShadows') }}</strong> {{ $t('mordred.leadShadowsContent') }}
+      </li>
+      <li>
+        <strong>{{ $t('mordred.protectIdentity') }}</strong>
+        <LocalizedTextWrapper keypath="mordred.protectIdentityContent" />
+      </li>
+    </ul>
+
+    <p>
+      <LocalizedTextWrapper keypath="mordred.commandTheShadows" />
+    </p>
+    <WikiPlayCta />
+  </div>
+</template>
+
+<script lang="ts">
+import WikiPlayCta from '@/components/view/information/WikiPlayCta.vue';
+import { defineComponent } from 'vue';
+import WikiRoleGuide from '@/components/view/information/WikiRoleGuide.vue';
+import WikiBreadCrumbs from '@/components/header/WikiBreadCrumbs.vue';
+import PreviewLink from '@/components/view/information/PreviewLink.vue';
+import SchemaImage from '@/components/view/SchemaImage.vue';
+import LocalizedTextWrapper from '@/components/feedback/LocalizedTextWrapper.vue';
+import TopRolePlayer from '@/components/stats/TopRolePlayer.vue';
+import { calculateRoleUrl } from '@/helpers/styles';
+
+export default defineComponent({
+  components: {
+    WikiPlayCta,
+    WikiRoleGuide,
+    WikiBreadCrumbs,
+    PreviewLink,
+    SchemaImage,
+    LocalizedTextWrapper,
+    TopRolePlayer,
+  },
+  methods: {
+    calculateRoleUrl: calculateRoleUrl,
+  },
+});
+</script>
+
+<style scoped lang="scss">
+@import '@/styles/info-page.scss';
+@import '@/styles/wiki-page.scss';
+
+h2 {
+  margin-top: 20px;
+}
+</style>

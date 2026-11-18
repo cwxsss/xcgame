@@ -1,0 +1,45 @@
+import { trapper } from '../trapper';
+import { beginnerReview } from '../beginnerReview';
+import { beginnerTips } from '../beginnerTips';
+import aiAgents from './aiAgents';
+import aiArena from './aiArena';
+import { passwordRecovery } from '../passwordRecovery';
+import { premiumCosmetics } from '../premiumCosmetics';
+import stickers from '@/i18n/langs/en/stickers';
+/**
+ * Main export file for Portuguese translations
+ * Imports and combines all feature-specific translation modules
+ */
+import pages from '@/i18n/langs/pages';
+import menu from './menu';
+import room from './room';
+import game from './game';
+import roles from './roles';
+import addons from './addons';
+import history from './history';
+import ui from './ui';
+import errors from './errors';
+import modals from './modals';
+import achievements from './achievements';
+
+export const pt = {
+  trapper: trapper['pt'],
+  aiArena,
+  beginnerReview: beginnerReview['pt'],
+  beginnerTips: beginnerTips['pt'],
+  aiAgents,
+  passwordRecovery: passwordRecovery['pt'],
+  premiumCosmetics: premiumCosmetics.pt,
+  ...menu,
+  ...stickers,
+  ...room,
+  ...game,
+  ...roles,
+  ...addons,
+  ...history,
+  ...ui,
+  ...errors,
+  ...modals,
+  ...achievements,
+  ...pages.pt,
+};

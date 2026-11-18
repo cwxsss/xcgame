@@ -1,0 +1,93 @@
+name: Deploy to server
+run-name: "${{ inputs.check_only && 'Check' || 'Deploy' }} ${{ inputs.tag }} on production"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published release tag (for example v71.0.0); wait for Publish to finish'
+        required: true
+        type: string
+      check_only:
+        description: 'Preflight only: pull images and check health, without restarting production'
+        required: true
+        type: boolean
+        default: false
+
+      skip_room_check:
+        description: 'Пропустить проверку комнат (незавершённые игры могут потерять состояние)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalon-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-to-server:
+    name: deploy to server
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: production
+      url: https://avalon-game.com
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      CHECK_ONLY: ${{ inputs.check_only }}
+      SKIP_ROOM_CHECK: ${{ inputs.skip_room_check }}
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9.-]*)?$ ]] || (( ${#RELEASE_TAG} > 128 )); then
+            echo '::error::Expected a published version tag such as v71.0.0'
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test deployment safeguards
+        run: python3 -m unittest discover -s deploy/firstbyte -p test_deploy.py
+
+      - name: Verify release tag exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --silent
+
+      - name: Deploy published images over restricted SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.FIRSTBYTE_DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_HOST: ${{ secrets.FIRSTBYTE_DEPLOY_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.FIRSTBYTE_DEPLOY_USER }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.FIRSTBYTE_DEPLOY_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_SSH_KEY" || { echo '::error::Missing production secret FIRSTBYTE_DEPLOY_SSH_KEY'; exit 1; }
+          : "${DEPLOY_SSH_HOST:?Missing production SSH host secret}"
+          : "${DEPLOY_SSH_USER:?Missing production SSH user secret}"
+          : "${DEPLOY_SSH_KNOWN_HOSTS:?Missing production SSH host key secret}"
+          umask 077
+          key_file=$(mktemp)
+          known_hosts_file=$(mktemp)
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_file"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$known_hosts_file"
+          operation=deploy
+          if [[ "$SKIP_ROOM_CHECK" == true ]]; then operation=deploy-skip-rooms; fi
+          if [[ "$CHECK_ONLY" == true ]]; then operation=check; fi
+          ssh -T -i "$key_file" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_file" \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=6 \
+            -- "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" "$operation $RELEASE_TAG"
+
+      - name: Check public HTTPS from the GitHub runner
+        run: curl --fail --silent --show-error --max-time 20 --output /dev/null https://avalon-game.com/

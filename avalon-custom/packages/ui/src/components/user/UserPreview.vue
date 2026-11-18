@@ -1,0 +1,150 @@
+<template>
+  <div class="user-preview d-flex align-center" :class="[`user-preview--${size}`]" @click="$emit('click')">
+    <v-skeleton-loader class="loader" v-if="!userState || userState.status === 'loading'" type="list-item-avatar" />
+    <template v-else>
+      <Avatar class="user-preview__avatar" :avatarID="userState.profile.avatar" />
+      <div class="user-preview__name ml-2">
+        <span v-if="seat" class="user-seat">#{{ seat }}</span>
+        {{ userState.profile.name }}
+        <AdminBadge v-if="userState.profile.isAdmin === true" />
+        <PremiumBadge v-else-if="userState.profile.premium" />
+      </div>
+    </template>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, computed } from 'vue';
+import PremiumBadge from '@/components/user/PremiumBadge.vue';
+import AdminBadge from '@/components/user/AdminBadge.vue';
+import Avatar from '@/components/user/Avatar.vue';
+import { useUserProfile } from '@/helpers/composables';
+
+export default defineComponent({
+  components: { AdminBadge, PremiumBadge, Avatar },
+  props: {
+    seat: { type: Number },
+    userID: {
+      type: String,
+      required: true,
+    },
+    size: {
+      type: String,
+      default: 'medium', // 'small', 'medium', 'large', 'chat'
+      validator: (value: string) => ['small', 'medium', 'large', 'chat'].includes(value),
+    },
+  },
+  emits: ['click'],
+  setup(props) {
+    const { userState } = useUserProfile(props.userID);
+
+    return {
+      userState,
+    };
+  },
+});
+</script>
+
+<style scoped lang="scss">
+.user-seat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  margin-right: 6px;
+  padding: 0 5px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.35);
+  border-radius: 6px;
+  color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.1);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.user-preview {
+  margin-bottom: 4px;
+}
+
+.user-preview__avatar {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.user-preview__name {
+  font-weight: 500;
+  color: var(--v-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The chat author uses the available row width instead of a short profile label. */
+.user-preview--chat {
+  min-width: 0;
+  .user-preview__name {
+    min-width: 0;
+    font-size: 14px;
+  }
+  .user-preview__avatar {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+}
+
+/* Size variants */
+.user-preview[class*='small'] {
+  .user-preview__name {
+    font-size: 12px;
+    max-width: 60px;
+  }
+
+  .user-preview__avatar {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.user-preview[class*='medium'] {
+  .user-preview__name {
+    font-size: 14px;
+    max-width: 70px;
+  }
+
+  .user-preview__avatar {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.user-preview[class*='large'] {
+  .user-preview__name {
+    font-size: 16px;
+    max-width: 80px;
+  }
+
+  .user-preview__avatar {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.loader {
+  height: 24px;
+  width: 100px;
+}
+
+:deep(.v-skeleton-loader__avatar) {
+  margin: 0px;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+}
+
+:deep(.v-skeleton-loader__text) {
+  margin: 0px;
+  margin-left: 8px;
+}
+</style>
