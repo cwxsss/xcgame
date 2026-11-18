@@ -190,8 +190,10 @@ export function AvalonBoard({
   ].filter(Boolean);
 
   const name = (id) =>
-    matchData?.find(({ id: seat }) => idOf(seat) === idOf(id))?.name ??
-    `座位 ${Number(id) + 1}`;
+    G.bots?.includes(idOf(id))
+      ? `AI ${Number(id) + 1}`
+      : (matchData?.find(({ id: seat }) => idOf(seat) === idOf(id))?.name ??
+        `座位 ${Number(id) + 1}`);
   const occupied = (id) =>
     Boolean(matchData?.find(({ id: seat }) => idOf(seat) === idOf(id))?.name);
 
@@ -298,10 +300,49 @@ export function AvalonBoard({
           </section>
         )}
         <div className="tabletop-grid">
-          <section className="tabletop-card">
+          <section className="tabletop-card avalon-table-card">
             <h2>玩家席位</h2>
-            <div className="avalon-table">
-              {players.map((player) => {
+            <div
+              className="avalon-table"
+              style={{ '--seat-count': players.length || 1 }}
+            >
+              <div className="avalon-table-center" aria-live="polite">
+                <strong>{phases[phase] || phase}</strong>
+                <span>
+                  远征 {Math.min(questIndex + 1, G.questSizes?.length || 5)}/
+                  {G.questSizes?.length || 5}
+                </span>
+                <div className="avalon-table-quests" aria-label="五轮远征概览">
+                  {G.questSizes.map((count, index) => {
+                    const round = index + 1;
+                    const result = G.history.find(
+                      ({ quest }) => quest === round,
+                    );
+                    const status = result
+                      ? result.success
+                        ? '成功'
+                        : '失败'
+                      : index === questIndex &&
+                          phase !== 'waiting' &&
+                          phase !== 'finished'
+                        ? '当前'
+                        : '待开始';
+                    return (
+                      <span
+                        key={round}
+                        data-status={status}
+                        aria-label={`第 ${round} 轮 · ${count} 人 · ${status}`}
+                      >
+                        {result ? (result.success ? '✓' : '×') : count}
+                      </span>
+                    );
+                  })}
+                </div>
+                {G.proposal?.length > 0 && (
+                  <small>当前队伍 {G.proposal.length} 人</small>
+                )}
+              </div>
+              {players.map((player, index) => {
                 const { id } = player;
                 const selected =
                   selectedTeam.includes(idOf(id)) ||
@@ -316,6 +357,10 @@ export function AvalonBoard({
                   <div
                     key={id}
                     className={`avalon-player ${isLeader ? 'is-leader' : ''} ${idOf(id) === idOf(playerID) ? 'is-you' : ''} ${selected ? 'is-selected' : ''}`}
+                    style={{
+                      '--seat-angle': `${(index / Math.max(players.length, 1)) * 360 - 90}deg`,
+                      '--seat-angle-reverse': `${90 - (index / Math.max(players.length, 1)) * 360}deg`,
+                    }}
                   >
                     <div className="avalon-player-name">
                       {phase === 'finished' &&
@@ -630,13 +675,18 @@ export function AvalonBoard({
                         <details>
                           <summary>{label}</summary>
                           {proposals.map(
-                            ({ team, approved, votes }, attempt) => (
+                            ({ team, approved, votes, leaderID }, attempt) => (
                               <section className="avalon-ballot" key={attempt}>
                                 <h3>
                                   第 {attempt + 1} 次组队表决 ·{' '}
                                   {approved ? '通过' : '否决'}
                                 </h3>
-                                <p>队伍：{team.map(name).join('、')}</p>
+                                <p>
+                                  {leaderID != null && (
+                                    <>队长：{name(leaderID)} · </>
+                                  )}
+                                  队伍：{team.map(name).join('、')}
+                                </p>
                                 <BallotList
                                   votes={votes}
                                   name={name}
@@ -672,6 +722,11 @@ export function AvalonBoard({
                 第 4、5 次远征需要至少两张失败牌才判定失败。
               </p>
             )}
+            <AvalonVoteMatrix
+              history={G.teamVotesHistory}
+              players={G.players}
+              name={name}
+            />
           </aside>
         </div>
       </div>
@@ -1197,13 +1252,21 @@ function AvalonMobile({
                     <details className="avalon-mobile-ballots">
                       <summary>组队票型 · {proposals.length} 次</summary>
                       {proposals.map(
-                        ({ team: proposal, approved, votes }, attempt) => (
+                        (
+                          { team: proposal, approved, votes, leaderID },
+                          attempt,
+                        ) => (
                           <section key={attempt}>
                             <span>
                               第 {attempt + 1} 次组队 ·{' '}
                               {approved ? '通过' : '否决'}
                             </span>
-                            <small>{proposal.map(name).join('、')}</small>
+                            <small>
+                              {leaderID != null && (
+                                <>队长：{name(leaderID)} · </>
+                              )}
+                              {proposal.map(name).join('、')}
+                            </small>
                             {votes && (
                               <BallotList
                                 votes={votes}
@@ -1222,6 +1285,12 @@ function AvalonMobile({
             })
             .reverse()}
         </ol>
+        <AvalonVoteMatrix
+          history={voteHistory}
+          players={G.players}
+          name={name}
+          compact
+        />
       </details>
     </div>
   );
@@ -1282,14 +1351,111 @@ function MobileAvalonClock({ clock, actionSeconds }) {
 }
 
 function BallotList({ votes, name, yes, no }) {
+  const { yesCount, noCount, total } = voteCounts({ votes });
   return (
-    <ul className="avalon-history">
-      {Object.entries(votes).map(([id, vote]) => (
-        <li key={id}>
-          <span>{name(id)}</span>
-          <strong>{vote ? yes : no}</strong>
-        </li>
+    <div className="avalon-ballot-summary" aria-label="公开票数">
+      <span className="is-yes">
+        {yes} {yesCount}
+      </span>
+      <span className="is-no">
+        {no} {noCount}
+      </span>
+      {total > 0 && <small>共 {total} 票</small>}
+      {Object.entries(votes ?? {}).map(([id, vote]) => (
+        <span key={id} className={vote ? 'is-yes' : 'is-no'}>
+          {name(id)} {vote ? yes : no}
+        </span>
       ))}
-    </ul>
+    </div>
+  );
+}
+
+function voteCounts(ballot) {
+  const votes = ballot?.votes;
+  if (votes && typeof votes === 'object') {
+    const values = Array.isArray(votes) ? votes : Object.values(votes);
+    return {
+      yesCount: values.filter(Boolean).length,
+      noCount: values.filter((vote) => !vote).length,
+      total: values.length,
+    };
+  }
+  const yesCount = Number(ballot?.yes ?? ballot?.approvedCount ?? 0);
+  const noCount = Number(ballot?.no ?? ballot?.rejectedCount ?? 0);
+  return {
+    yesCount: Number.isFinite(yesCount) ? yesCount : 0,
+    noCount: Number.isFinite(noCount) ? noCount : 0,
+    total:
+      (Number.isFinite(yesCount) ? yesCount : 0) +
+      (Number.isFinite(noCount) ? noCount : 0),
+  };
+}
+
+function AvalonVoteMatrix({ history = [], players, name, compact = false }) {
+  const attempts = new Map();
+  const columns = history
+    .map((ballot) => {
+      const attempt = (attempts.get(ballot.quest) ?? 0) + 1;
+      attempts.set(ballot.quest, attempt);
+      return { ballot, attempt, key: ballot.quest + ':' + attempt };
+    })
+    .reverse();
+
+  return (
+    <details className={`avalon-vote-matrix${compact ? ' is-compact' : ''}`}>
+      <summary>组队投票表</summary>
+      {columns.length === 0 ? (
+        <p className="avalon-vote-matrix-empty">暂无组队投票记录</p>
+      ) : (
+        <div
+          className="avalon-vote-matrix-scroll"
+          tabIndex={0}
+          aria-label="组队投票表"
+        >
+          <table aria-label="组队投票表">
+            <thead>
+              <tr>
+                <th scope="col">玩家</th>
+                {columns.map(({ ballot, attempt, key }) => (
+                  <th scope="col" key={key}>
+                    第 {ballot.quest} 轮 · 提案 {attempt}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {players.map(({ id }) => (
+                <tr key={id}>
+                  <th scope="row">{name(id)}</th>
+                  {columns.map(({ ballot, key }) => {
+                    const vote = ballot.votes?.[id];
+                    const label =
+                      vote === true ? '赞成' : vote === false ? '反对' : '—';
+                    return (
+                      <td
+                        key={key}
+                        className={
+                          vote === true
+                            ? 'is-approved'
+                            : vote === false
+                              ? 'is-rejected'
+                              : 'is-empty'
+                        }
+                      >
+                        {label}
+                        {String(ballot.leaderID) === String(id) && (
+                          <span>队长</span>
+                        )}
+                        {ballot.team?.includes(id) && <span>入队</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </details>
   );
 }

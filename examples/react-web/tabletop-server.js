@@ -57,7 +57,30 @@ const games = [
       },
     },
   },
-  { ...Avalon, moves: { ...Avalon.moves, fillBots: fillBots('avalon') } },
+  {
+    ...Avalon,
+    moves: {
+      ...Avalon.moves,
+      fillBots: fillBots('avalon'),
+      syncSeats: {
+        client: false,
+        noLimit: true,
+        ignoreStaleStateID: true,
+        move({ G, playerID }, seats) {
+          if (
+            String(playerID) !== '0' ||
+            G.phase !== 'waiting' ||
+            !Array.isArray(seats) ||
+            seats.some((id) => !/^\d+$/.test(String(id)))
+          )
+            return INVALID_MOVE;
+          const ready = [...G.ready];
+          for (const id of seats) ready[Number(id)] = false;
+          return { ...G, ready };
+        },
+      },
+    },
+  },
 ];
 
 const roomCode = /^[A-Za-z0-9_-]{1,80}$/;
@@ -167,7 +190,7 @@ class TabletopTransport extends SocketIO {
           if (
             event === 'update' &&
             (args[0]?.type !== 'MAKE_MOVE' ||
-              ['fillBots', 'markActionTimeouts'].includes(
+              ['fillBots', 'markActionTimeouts', 'syncSeats'].includes(
                 args[0].payload?.type,
               ) ||
               typeof args[3] !== 'string' ||
@@ -281,6 +304,117 @@ async function rematch(ctx, matchID) {
   };
 }
 
+const publicMatchData = (matchID, metadata, state) => ({
+  ...metadata,
+  matchID,
+  seatingOpen:
+    metadata.gameName === 'avalon' &&
+    state?.G?.phase === 'waiting' &&
+    !state.G.bots?.length,
+  players: Object.values(metadata.players).map((player) => {
+    const { credentials, ...publicPlayer } = player;
+    return publicPlayer;
+  }),
+});
+
+function clearSeatMetadata(seat) {
+  const cleared = { ...seat };
+  delete cleared.name;
+  delete cleared.credentials;
+  delete cleared.isConnected;
+  delete cleared.data;
+  return cleared;
+}
+
+async function seatAvalon(ctx, matchID) {
+  const { playerID, credentials, targetID } = ctx.request.body ?? {};
+  if (
+    typeof playerID !== 'string' ||
+    !/^\d+$/.test(playerID) ||
+    (credentials !== undefined && typeof credentials !== 'string') ||
+    !(targetID === null || typeof targetID === 'string') ||
+    (typeof targetID === 'string' && !/^\d+$/.test(targetID))
+  )
+    ctx.throw(400, 'playerID, credentials and targetID are invalid');
+
+  const { metadata, state } = await server.db.fetch(matchID, {
+    metadata: true,
+    state: true,
+  });
+  if (metadata?.gameName !== 'avalon' || !state) ctx.throw(404);
+  if (!isWaiting('avalon', state.G) || state.G.bots?.length)
+    ctx.throw(409, '游戏已经开始，不能调整座位');
+
+  const current = metadata.players[playerID];
+  if (!current) ctx.throw(404, 'Player ' + playerID + ' not found');
+  if (
+    !(await server.auth.authenticateCredentials({
+      playerID,
+      credentials,
+      metadata,
+    }))
+  )
+    ctx.throw(403, 'Invalid credentials');
+
+  // Seat 0 remains the room owner. startGame, AI fill and the lobby controls
+  // intentionally use this stable identity for host-only operations.
+  if (playerID === '0' && targetID !== '0') ctx.throw(409, '房主固定在1号位');
+  if (targetID === playerID) {
+    ctx.body = { playerID, playerCredentials: credentials };
+    return;
+  }
+
+  const touchedSeats = [playerID];
+  const nextMetadata = {
+    ...metadata,
+    players: { ...metadata.players },
+  };
+  let result;
+  if (targetID === null) {
+    nextMetadata.players[playerID] = clearSeatMetadata(current);
+  } else {
+    const target = metadata.players[targetID];
+    if (!target) ctx.throw(404, 'Player ' + targetID + ' not found');
+    if (target.name || target.credentials) ctx.throw(409, '目标座位已被占用');
+    touchedSeats.push(targetID);
+    const playerCredentials = await server.auth.generateCredentials(ctx);
+    const moved = {
+      ...target,
+      name: current.name,
+      credentials: playerCredentials,
+    };
+    if (current.data !== undefined) moved.data = current.data;
+    delete moved.isConnected;
+    nextMetadata.players[playerID] = clearSeatMetadata(current);
+    nextMetadata.players[targetID] = moved;
+    result = { playerID: targetID, playerCredentials };
+  }
+
+  try {
+    await server.db.setMetadata(matchID, nextMetadata);
+    const moveResult = await runGameMove('avalon', matchID, state, {
+      playerID: '0',
+      name: 'syncSeats',
+      args: [touchedSeats],
+    });
+    if (moveResult?.error) throw new Error(moveResult.error);
+  } catch (error) {
+    await server.db.setMetadata(matchID, metadata);
+    throw error;
+  }
+  const { metadata: updatedMetadata, state: updatedState } =
+    await server.db.fetch(matchID, { metadata: true, state: true });
+  server.transport.createTransportAPI(matchID).sendAll({
+    type: 'matchData',
+    args: [
+      matchID,
+      publicMatchData(matchID, updatedMetadata ?? nextMetadata, updatedState)
+        .players,
+    ],
+  });
+  ctx.body = result ?? { ok: true };
+}
+
 server.app.use(async (ctx, next) => {
   let pathname;
   try {
@@ -303,10 +437,16 @@ server.app.use(async (ctx, next) => {
     async function handleRoom() {
       const { metadata, state } = await server.db.fetch(matchID, {
         metadata: true,
-        state: action === 'join',
+        state: action === 'join' || (ctx.method === 'GET' && !action),
       });
       if (metadata?.gameName !== gameName) ctx.throw(404);
       if (action === 'join' && state?.G.bots?.length) ctx.throw(409);
+      if (
+        action === 'join' &&
+        gameName === 'avalon' &&
+        !isWaiting(gameName, state?.G)
+      )
+        ctx.throw(409, '游戏已经开始，不能加入');
       await next();
     }
 
@@ -314,6 +454,13 @@ server.app.use(async (ctx, next) => {
     // Keeping an occupied seat bound to its credentials also enables reconnects.
     if (ctx.method === 'POST' && action === 'join') {
       return server.transport.getMatchQueue(matchID).add(handleRoom);
+    }
+    if (ctx.method === 'POST' && gameName === 'avalon' && action === 'seat') {
+      return parseRoomRequest(ctx, () =>
+        server.transport
+          .getMatchQueue(matchID)
+          .add(() => seatAvalon(ctx, matchID)),
+      );
     }
     if (
       ctx.method === 'POST' &&
@@ -365,7 +512,15 @@ server.app.use(async (ctx, next) => {
         }),
       );
     }
-    if (ctx.method === 'GET' && !action) return handleRoom();
+    if (ctx.method === 'GET' && !action) {
+      const { metadata, state } = await server.db.fetch(matchID, {
+        metadata: true,
+        state: true,
+      });
+      if (metadata?.gameName !== gameName) ctx.throw(404);
+      ctx.body = publicMatchData(matchID, metadata, state);
+      return;
+    }
     ctx.throw(404);
   }
 

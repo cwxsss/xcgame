@@ -51,6 +51,227 @@
   font-weight: 700;
 }
 
+/* The desktop board is a small round table rather than a second card grid.
+ * Seat cards stay keyboard reachable while the table centre keeps the phase
+ * and current expedition visible at a glance. */
+@media (min-width: 621px) {
+  .avalon-table-card {
+    overflow: hidden;
+  }
+
+  .avalon-table {
+    position: relative;
+    display: block;
+    min-height: 520px;
+    overflow: hidden;
+    isolation: isolate;
+    border: 1px solid #cad9e9;
+    border-radius: 28px;
+    background:
+      radial-gradient(circle at center, #f9fcff 0 28%, transparent 29%),
+      linear-gradient(135deg, #edf5ff, #f9fbff 52%, #e5effb);
+  }
+
+  .avalon-table::before {
+    position: absolute;
+    inset: 68px 11%;
+    z-index: -1;
+    border: 12px solid rgba(86, 137, 184, 0.12);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow:
+      0 14px 30px rgba(32, 69, 107, 0.12) inset,
+      0 10px 24px rgba(42, 74, 108, 0.08);
+    content: '';
+  }
+
+  .avalon-table-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    width: min(190px, 32%);
+    min-height: 94px;
+    place-content: center;
+    gap: 5px;
+    transform: translate(-50%, -50%);
+    border: 1px solid #c4d7ea;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #24476d;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(53, 87, 122, 0.1);
+  }
+
+  .avalon-table-center strong {
+    font-size: 1rem;
+  }
+
+  .avalon-table-center span {
+    color: #4c6a86;
+    font-size: 0.84rem;
+  }
+
+  .avalon-table-center small {
+    color: #788da4;
+    font-size: 0.72rem;
+  }
+
+  .avalon-table > .avalon-player {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: clamp(128px, 20%, 178px);
+    min-height: 88px;
+    margin: 0;
+    transform: translate(-50%, -50%) rotate(var(--seat-angle))
+      translateY(-210px) rotate(var(--seat-angle-reverse));
+    transform-origin: center center;
+    box-shadow: 0 6px 14px rgba(37, 71, 105, 0.08);
+  }
+
+  .avalon-table > .avalon-player .tabletop-button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.avalon-vote-matrix {
+  margin-top: 14px;
+  border: 1px solid #d8e3ef;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 10px;
+}
+
+.avalon-vote-matrix-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: #294c70;
+}
+
+.avalon-vote-matrix-heading span {
+  color: #71849a;
+  font-size: 0.76rem;
+}
+
+.avalon-vote-matrix-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.avalon-vote-matrix table {
+  width: 100%;
+  min-width: 360px;
+  border-collapse: separate;
+  border-spacing: 3px;
+  color: #405b77;
+  font-size: 0.78rem;
+}
+
+.avalon-vote-matrix th,
+.avalon-vote-matrix td {
+  border: 1px solid #dbe5ef;
+  border-radius: 5px;
+  background: #fff;
+  padding: 5px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.avalon-vote-matrix thead th {
+  background: #edf4fb;
+  color: #4d6883;
+  font-weight: 700;
+}
+
+.avalon-vote-matrix tbody th {
+  background: #f2f6fa;
+  color: #31587d;
+}
+
+.avalon-vote-matrix td {
+  display: table-cell;
+}
+
+.avalon-vote-matrix td strong,
+.avalon-vote-matrix td span {
+  display: block;
+}
+
+.avalon-vote-matrix td strong {
+  margin-bottom: 2px;
+  font-size: 0.72rem;
+}
+
+.avalon-vote-matrix td span {
+  color: #667b91;
+  font-size: 0.7rem;
+}
+
+.avalon-vote-matrix td.is-approved {
+  border-color: #9ed1b1;
+  background: #effaf2;
+}
+
+.avalon-vote-matrix td.is-approved strong {
+  color: #197346;
+}
+
+.avalon-vote-matrix td.is-rejected {
+  border-color: #e4b4b0;
+  background: #fff4f2;
+}
+
+.avalon-vote-matrix td.is-rejected strong {
+  color: #ad403a;
+}
+
+.avalon-vote-matrix td.is-empty {
+  color: #9aa9b8;
+}
+
+.avalon-vote-matrix-empty {
+  margin: 0;
+  color: #788da3;
+  font-size: 0.78rem;
+}
+
+.avalon-ballot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  color: #526b84;
+  font-size: 0.76rem;
+}
+
+.avalon-ballot-summary span {
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-weight: 700;
+}
+
+.avalon-ballot-summary .is-yes {
+  background: #e5f5eb;
+  color: #1f7748;
+}
+
+.avalon-ballot-summary .is-no {
+  background: #fff0ee;
+  color: #ad433b;
+}
+
+.avalon-ballot-summary small {
+  color: #7d8fa2;
+}
+
 .avalon-mobile-board {
   display: none;
 }
@@ -550,6 +771,39 @@
     margin: 0;
   }
 
+  .avalon-mobile .avalon-vote-matrix {
+    margin-top: 8px;
+    padding: 6px;
+  }
+
+  .avalon-mobile .avalon-vote-matrix-heading {
+    margin-bottom: 4px;
+  }
+
+  .avalon-mobile .avalon-vote-matrix-heading strong {
+    font-size: 0.72rem;
+  }
+
+  .avalon-mobile .avalon-vote-matrix-heading span {
+    font-size: 0.6rem;
+  }
+
+  .avalon-mobile .avalon-vote-matrix table {
+    min-width: 334px;
+    border-spacing: 2px;
+    font-size: 0.66rem;
+  }
+
+  .avalon-mobile .avalon-vote-matrix th,
+  .avalon-mobile .avalon-vote-matrix td {
+    padding: 3px 4px;
+  }
+
+  .avalon-mobile .avalon-vote-matrix td strong,
+  .avalon-mobile .avalon-vote-matrix td span {
+    font-size: 0.62rem;
+  }
+
   .avalon-mobile-timer-settings summary {
     cursor: pointer;
     color: #476481;
@@ -637,4 +891,48 @@
   .avalon-mobile-board {
     display: none;
   }
+}
+
+.avalon-vote-matrix tr > th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avalon-vote-matrix summary {
+  cursor: pointer;
+}
+
+.avalon-table-quests {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.avalon-table-quests > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #adc2d8;
+  border-radius: 50%;
+  background: #edf4fb;
+  font-weight: 700;
+}
+
+.avalon-table-quests > [data-status='当前'] {
+  border-color: #516f94;
+}
+
+.avalon-table-quests > [data-status='成功'] {
+  background: #e1f5e5;
+  color: #176046;
+}
+
+.avalon-table-quests > [data-status='失败'] {
+  background: #ffe5e1;
+  color: #9d392f;
 }

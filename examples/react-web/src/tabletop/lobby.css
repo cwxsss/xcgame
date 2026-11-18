@@ -634,3 +634,24 @@ a {
     font-size: 0.75rem;
   }
 }
+
+.tt-avalon-seat-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  gap: 6px;
+  margin-block: 8px;
+}
+
+.tt-avalon-seat-choices button[aria-pressed='true'] {
+  border-color: #6652a3;
+  background: #eee7fb;
+  color: #342465;
+}
+
+.tt-avalon-seat-controls {
+  margin-block: 5px;
+}
+
+.tt-avalon-seat-controls summary {
+  cursor: pointer;
+}

@@ -493,7 +493,13 @@ const Avalon = {
           Object.values(votes).filter(Boolean).length > G.players.length / 2;
         const teamVotesHistory = [
           ...G.teamVotesHistory,
-          { quest: G.questIndex + 1, team: G.proposal, approved, votes },
+          {
+            quest: G.questIndex + 1,
+            leaderID: G.leaderID,
+            team: G.proposal,
+            approved,
+            votes,
+          },
         ];
         if (!approved) {
           const rejectedVotes = G.rejectedVotes + 1;

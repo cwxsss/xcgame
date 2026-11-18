@@ -99,6 +99,47 @@ function saveSeat(room, { playerID, playerCredentials }) {
   return seat;
 }
 
+function clearSeat(room) {
+  const key = seatKey(room);
+  seats.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Storage can be unavailable in a private browsing context.
+  }
+}
+
+function AvalonSeatChoices({
+  players,
+  currentID,
+  selectedID,
+  onSelect,
+  disabled,
+}) {
+  return (
+    <div className="tt-avalon-seat-choices" role="group" aria-label="选择座位">
+      {players.map((player) => {
+        const id = String(player.id);
+        return (
+          <button
+            key={id}
+            className="tt-button tt-secondary"
+            type="button"
+            aria-pressed={id === selectedID}
+            disabled={disabled || Boolean(player.name) || id === '0'}
+            onClick={() => onSelect(id)}
+          >
+            {Number(id) + 1}号 ·{' '}
+            {id === currentID
+              ? '你'
+              : (player.name ?? (id === '0' ? '房主位' : '空座'))}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 async function request(path, data) {
   const response = await fetch(
     path,
@@ -381,6 +422,7 @@ function AvalonOptions({ options, setOptions, setCount }) {
 function Room({ room }) {
   const [info, setInfo] = useState(null);
   const [seat, setSeat] = useState(() => readSeat(room));
+  const [selectedSeat, setSelectedSeat] = useState(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -393,6 +435,9 @@ function Room({ room }) {
   const [rematchError, setRematchError] = useState('');
   const game = games[room.game];
   const GameClient = clients[room.game];
+  const isAvalon = room.game === 'avalon';
+  const seatingOpen = isAvalon && info?.seatingOpen;
+  const canChangeSeat = seatingOpen && waiting && seat && seat.playerID !== '0';
   const inviteUrl = new URL(roomHash(room), window.location.origin).href;
 
   useEffect(() => {
@@ -409,16 +454,70 @@ function Room({ room }) {
     };
   }, [room.game, room.matchID, retry]);
 
+  useEffect(() => {
+    if (!seatingOpen || (seat && !waiting)) return undefined;
+    let active = true;
+    let pending = false;
+    const timer = window.setInterval(async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const match = await request(roomPath(room));
+        if (active) setInfo(match);
+      } catch {
+        // The next refresh can recover a temporary network failure.
+      } finally {
+        pending = false;
+      }
+    }, 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [room, seatingOpen, seat, waiting]);
+
+  async function changeSeat(targetID) {
+    if (!canChangeSeat || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await request(roomPath(room) + '/seat', {
+        playerID: seat.playerID,
+        credentials: seat.credentials,
+        targetID,
+      });
+      if (targetID === null) {
+        clearSeat(room);
+        setSeat(null);
+      } else {
+        setSeat(saveSeat(room, result));
+      }
+      setSelectedSeat(null);
+    } catch (cause) {
+      setError(cause.message);
+    } finally {
+      setRetry((value) => value + 1);
+      setBusy(false);
+    }
+  }
+
   async function join(event) {
     event.preventDefault();
-    if (!name.trim() || busy) return;
+    if (
+      !name.trim() ||
+      busy ||
+      (isAvalon && (!seatingOpen || selectedSeat === null))
+    )
+      return;
     setBusy(true);
     setError('');
     try {
       const result = await request(`${roomPath(room)}/join`, {
         playerName: name.trim(),
+        ...(isAvalon ? { playerID: selectedSeat } : {}),
       });
       setSeat(saveSeat(room, result));
+      setSelectedSeat(null);
     } catch (cause) {
       setError(cause.message);
     } finally {
@@ -551,7 +650,27 @@ function Room({ room }) {
       {info &&
         (seat ? (
           <>
+            {canChangeSeat && (
+              <details className="tt-panel tt-avalon-seat-controls">
+                <summary>换座或离座</summary>
+                <AvalonSeatChoices
+                  players={info.players}
+                  currentID={seat.playerID}
+                  disabled={busy}
+                  onSelect={changeSeat}
+                />
+                <button
+                  type="button"
+                  className="tt-button tt-secondary"
+                  disabled={busy}
+                  onClick={() => changeSeat(null)}
+                >
+                  离开座位
+                </button>
+              </details>
+            )}
             <GameClient
+              key={`board:${seat.playerID}`}
               matchID={room.matchID}
               playerID={seat.playerID}
               credentials={seat.credentials}
@@ -563,12 +682,28 @@ function Room({ room }) {
                 ? { onStartWithAI: startWithAI, startingWithAI }
                 : {})}
             />
-            <VoicePanel gameName={room.game} matchID={room.matchID} {...seat} />
+            <VoicePanel
+              key={`voice:${seat.playerID}`}
+              gameName={room.game}
+              matchID={room.matchID}
+              {...seat}
+            />
           </>
         ) : (
           <form className="tt-panel tt-join" onSubmit={join}>
             <h2>在这张桌上入座</h2>
             <p>{info.players.length} 人房间</p>
+            {isAvalon &&
+              (seatingOpen ? (
+                <AvalonSeatChoices
+                  players={info.players}
+                  selectedID={selectedSeat}
+                  disabled={busy}
+                  onSelect={setSelectedSeat}
+                />
+              ) : (
+                <p>当前房间已停止入座。</p>
+              ))}
             <label>
               你的昵称
               <input
@@ -582,7 +717,9 @@ function Room({ room }) {
             </label>
             <button
               className="tt-button tt-primary"
-              disabled={busy}
+              disabled={
+                busy || (isAvalon && (!seatingOpen || selectedSeat === null))
+              }
               type="submit"
             >
               {busy ? '正在加入…' : '加入房间'}
