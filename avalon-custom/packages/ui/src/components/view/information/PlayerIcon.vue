@@ -13,6 +13,7 @@
 <script lang="ts">
 import { defineComponent, PropType } from 'vue';
 import type { TPlayerIcon } from '@/components/view/information/interface';
+const rolePortraits = new URL('./xcgame-role-portraits.jpg', import.meta.url).href;
 
 const portraitSlots: Record<string, [number, number]> = {
   merlin: [0, 0],
@@ -35,7 +36,10 @@ export default defineComponent({
   computed: {
     portrait() {
       const slot = portraitSlots[this.icon];
-      return slot && { backgroundPosition: `${(slot[0] * 100) / 3}% ${slot[1] * 50}%` };
+      return slot && {
+        backgroundImage: `url("${rolePortraits}")`,
+        backgroundPosition: `${(slot[0] * 100) / 3}% ${slot[1] * 50}%`,
+      };
     },
     symbol() {
       if (this.icon === 'unknown') return '?';
@@ -59,7 +63,6 @@ export default defineComponent({
 }
 
 .player-icon-image.has-portrait {
-  background-image: url('./xcgame-role-portraits.jpg');
   background-size: 400% 300%;
   background-repeat: no-repeat;
 }

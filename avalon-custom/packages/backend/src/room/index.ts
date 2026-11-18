@@ -313,6 +313,10 @@ export class Room {
     this.updateRoomState();
   }
 
+  stopBuiltinBots() {
+    this.botRunner?.stop();
+  }
+
   protected destroyRoom() {
     eventBus.emit('destroyRoom', this);
   }

@@ -40,6 +40,9 @@ export function installSocketAdmission(io: Server) {
       if (user) allowed = allowed && limits.take(`user:${user}`, 600, 60000);
       if (event === 'registerUser') allowed = allowed && limits.take(`register:${ip}`, registrationsPerHour, 3600000);
       if (event === 'createGuest') allowed = allowed && limits.take(`guest:${ip}`, guestsPerHour, 3600000);
+      if (event === 'unlockRoomAdmin') {
+        allowed = allowed && limits.take(`room-admin:${ip}`, 5, 900000) && limits.take('room-admin-global', 20, 900000);
+      }
       if (event === 'login') {
         allowed = allowed && limits.take(`login-ip:${ip}`, 30, 900000);
         if (typeof first === 'string' && first.length <= 254)

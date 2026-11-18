@@ -119,6 +119,8 @@ current tree does not remove it from earlier Git commits.
 2. 在 `avalon-custom` 运行 `npm run build:hall-ui`，通过现有 MongoDB 配置启动新版阿瓦隆后端。
 3. 将 `AVALON_WEB_ROOT` 指向 `packages/ui/dist-hall`，运行 `npm run start:hall`。入口默认监听 `127.0.0.1:18996`，原游戏厅和阿瓦隆后端默认分别使用 `127.0.0.1:18997` 和 `127.0.0.1:3000`，可用 `TABLETOP_UPSTREAM` 和 `AVALON_UPSTREAM` 指定。
 
+如需启用大厅房间管理，在阿瓦隆后端的私有环境文件中配置 `XCGAME_ROOM_ADMIN_PASSWORD`。管理员验证绑定当前已登录的连接，最长有效八小时。删除会关闭活动房间并在 MongoDB 中记录大厅移除标记。已经保存的对局历史仍可访问。
+
 对外只提供合并入口。两个上游保留在回环地址。原游戏厅的入口 Cookie 同时用于保护新版阿瓦隆页面和联机连接。
 
 阿瓦隆语音使用现有 LiveKit 服务。按 `deploy/voice/livekit.yaml.example` 配置媒体服务，在阿瓦隆后端设置 `VOICE_ENABLED=true`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`LIVEKIT_INTERNAL_URL`、`LIVEKIT_PUBLIC_URL` 和 `VOICE_GATEWAY_PORT`。同源部署时，将 `LIVEKIT_PUBLIC_URL` 设为大厅的 WebSocket 源地址，合并入口的 `AVALON_VOICE_UPSTREAM` 指向语音网关的内部 HTTP 地址。生产环境使用 `wss://`，并按 LiveKit 的配置开放媒体端口。

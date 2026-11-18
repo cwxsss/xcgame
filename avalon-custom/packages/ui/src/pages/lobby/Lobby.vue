@@ -13,16 +13,6 @@
             <span class="material-icons" aria-hidden="true">add</span>
             {{ $t('mainPage.createRoom') }}
           </v-btn>
-          <nav class="lobby-links" :aria-label="$t('menu.wiki')">
-            <LocaleLink :to="{ name: 'rules' }"
-              ><span class="link-label">{{ $t('mainPage.rulesLink') }}</span
-              ><span aria-hidden="true">↗</span></LocaleLink
-            >
-            <LocaleLink :to="{ name: 'roles' }"
-              ><span class="link-label">{{ $t('wiki.roles') }}</span
-              ><span aria-hidden="true">↗</span></LocaleLink
-            >
-          </nav>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
@@ -38,6 +28,15 @@
         <div class="rooms-heading">
           <h2 id="games-title">{{ $t('mainPage.gamesList') }}</h2>
           <span v-if="roomsList" class="room-count">{{ roomsList.length }}</span>
+          <v-btn
+            class="admin-entry"
+            variant="text"
+            size="small"
+            prepend-icon="mdi-shield-key-outline"
+            @click="openAdminDialog"
+          >
+            管理员
+          </v-btn>
         </div>
         <div class="room-filters" role="group" :aria-label="$t('mainPage.filterLabel')">
           <button
@@ -72,7 +71,22 @@
           </button>
         </div>
         <div v-else class="games-list">
-          <LobbyRoom v-for="game in visibleRooms.slice(0, visibleLimit)" :key="game.uuid" :game="game" />
+          <div v-for="game in visibleRooms.slice(0, visibleLimit)" :key="game.uuid" class="room-list-item">
+            <LobbyRoom :game="game" />
+            <v-btn
+              v-if="adminUnlocked"
+              class="room-delete"
+              variant="text"
+              size="small"
+              color="error"
+              prepend-icon="mdi-trash-can-outline"
+              :loading="deletingRoom === game.uuid"
+              :disabled="Boolean(deletingRoom)"
+              @click="requestRoomDeletion(game.uuid)"
+            >
+              删除房间
+            </v-btn>
+          </div>
           <button v-if="visibleRooms.length > visibleLimit" class="show-more" @click="visibleLimit += 8">
             {{ $t('mainPage.showMore') }} <span aria-hidden="true">↓</span>
           </button>
@@ -96,9 +110,6 @@
             <li>{{ $t('mainPage.guideInvite') }}</li>
             <li>{{ $t('mainPage.guideStart') }}</li>
           </ol>
-          <v-btn color="primary" size="large" elevation="0" @click="createRoom">
-            {{ $t('mainPage.createRoom') }}
-          </v-btn>
         </div>
       </div>
       <div class="guide-questions">
@@ -113,6 +124,55 @@
         </details>
       </div>
     </section>
+
+    <v-dialog v-model="adminDialog" max-width="430">
+      <v-card class="admin-dialog">
+        <v-card-title class="d-flex align-center justify-space-between">
+          <span>管理员模式</span>
+          <v-btn icon="mdi-close" variant="text" aria-label="关闭" @click="adminDialog = false" />
+        </v-card-title>
+        <v-card-text>
+          <template v-if="adminUnlocked">
+            <div class="admin-status admin-status--success">
+              <v-icon icon="mdi-shield-check-outline" />
+              <span>管理员权限已启用，可以删除大厅房间。</span>
+            </div>
+            <p class="admin-help">删除会关闭房间并从大厅移除，已结束对局的历史记录仍会保留。</p>
+          </template>
+          <template v-else>
+            <p class="admin-help">输入管理员密码后，可以删除大厅中的测试房间。</p>
+            <v-text-field
+              v-model="adminPassword"
+              label="管理员密码"
+              type="password"
+              autocomplete="current-password"
+              variant="outlined"
+              density="comfortable"
+              autofocus
+              :error-messages="adminError ? [adminError] : []"
+              @keyup.enter="unlockAdmin"
+            />
+          </template>
+        </v-card-text>
+        <v-card-actions class="admin-actions">
+          <v-btn variant="text" @click="adminDialog = false">取消</v-btn>
+          <v-btn v-if="!adminUnlocked" color="primary" :loading="adminLoading" @click="unlockAdmin">验证密码</v-btn>
+          <v-btn v-else color="error" variant="tonal" @click="lockAdmin">退出管理员</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteDialog" max-width="430">
+      <v-card>
+        <v-card-title>删除房间？</v-card-title>
+        <v-card-text>房间会立即关闭并从大厅移除。已经结束的对局记录仍然保留。</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="deleteDialog = false">取消</v-btn>
+          <v-btn color="error" :loading="Boolean(deletingRoom)" @click="deleteRoom">确认删除</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </main>
 </template>
 
@@ -141,6 +201,14 @@ export default defineComponent({
     const aiRooms = ref<TRoomsList>();
     const aiLoading = ref(false);
     const aiError = ref(false);
+    const adminDialog = ref(false);
+    const adminPassword = ref('');
+    const adminError = ref('');
+    const adminLoading = ref(false);
+    const adminUnlocked = ref(false);
+    const deleteDialog = ref(false);
+    const roomToDelete = ref<string>();
+    const deletingRoom = ref<string>();
     let aiRefreshPending = false;
     const loadAiRooms = async () => {
       if (aiLoading.value) {
@@ -184,6 +252,89 @@ export default defineComponent({
         roomsList.value = data;
       } catch {
         roomsError.value = 'requestFailed';
+      }
+    };
+
+    const refreshAdminStatus = async () => {
+      try {
+        const result = await socket.timeout(10000).emitWithAck('getRoomAdminStatus');
+        adminUnlocked.value = result === true;
+      } catch {
+        adminUnlocked.value = false;
+      }
+    };
+
+    const openAdminDialog = () => {
+      if (!store.state.profile) {
+        eventBus.emit('openAuthModal', openAdminDialog);
+        return;
+      }
+      adminError.value = '';
+      adminPassword.value = '';
+      adminDialog.value = true;
+      void refreshAdminStatus();
+    };
+
+    const unlockAdmin = async () => {
+      if (!adminPassword.value.trim() || adminLoading.value) return;
+      adminLoading.value = true;
+      adminError.value = '';
+      try {
+        const result = await socket.timeout(10000).emitWithAck('unlockRoomAdmin', adminPassword.value);
+        if (result === true) {
+          adminUnlocked.value = true;
+          adminPassword.value = '';
+          adminDialog.value = false;
+          eventBus.emit('infoMessage', '管理员权限已启用');
+        } else {
+          adminError.value = isSocketError(result) ? '管理员密码错误或已失效' : '管理员密码错误';
+        }
+      } catch {
+        adminError.value = '验证失败，请稍后重试';
+      } finally {
+        adminLoading.value = false;
+      }
+    };
+
+    const lockAdmin = async () => {
+      try {
+        if (await socket.timeout(10000).emitWithAck('lockRoomAdmin') !== true) throw Error();
+        adminUnlocked.value = false;
+        adminDialog.value = false;
+      } catch {
+        eventBus.emit('infoMessage', '退出管理员失败，请稍后重试');
+      }
+    };
+
+    const requestRoomDeletion = (uuid: string) => {
+      roomToDelete.value = uuid;
+      deleteDialog.value = true;
+    };
+
+    const deleteRoom = async () => {
+      if (!roomToDelete.value || deletingRoom.value) return;
+      const uuid = roomToDelete.value;
+      deletingRoom.value = uuid;
+      try {
+        const result = await socket.timeout(10000).emitWithAck('deleteLobbyRoom', uuid);
+        if (result === true) {
+          roomsList.value = roomsList.value?.filter((room) => room.uuid !== uuid);
+          aiRooms.value = aiRooms.value?.filter((room) => room.uuid !== uuid);
+          deleteDialog.value = false;
+          roomToDelete.value = undefined;
+          eventBus.emit('infoMessage', '房间已删除');
+        } else if (isSocketError(result)) {
+          eventBus.emit('infoMessage', result.error === 'forbidden' ? '管理员权限已失效' : '删除房间失败');
+          if (result.error === 'forbidden') adminUnlocked.value = false;
+        } else {
+          deleteDialog.value = false;
+          eventBus.emit('infoMessage', '该房间已不在大厅');
+          void initState();
+        }
+      } catch {
+        eventBus.emit('infoMessage', '删除房间失败，请稍后重试');
+      } finally {
+        deletingRoom.value = undefined;
       }
     };
 
@@ -253,10 +404,19 @@ export default defineComponent({
       online.value = counter;
     };
     socket.on('onlineCounterUpdated', updateOnline);
+    const resetAdminStatus = () => {
+      adminUnlocked.value = false;
+      deleteDialog.value = false;
+    };
+    watch(() => store.state.profile?.token, resetAdminStatus);
+    socket.on('disconnect', resetAdminStatus);
+    if (store.state.profile) void refreshAdminStatus();
     onBeforeUnmount(() => {
       aiRefreshPending = false;
       socket.off('roomsListUpdated', updateRooms);
       socket.off('onlineCounterUpdated', updateOnline);
+      socket.off('disconnect', resetAdminStatus);
+      adminUnlocked.value = false;
     });
 
     return {
@@ -274,6 +434,18 @@ export default defineComponent({
       roomsList,
       roomsError,
       initState,
+      adminDialog,
+      adminPassword,
+      adminError,
+      adminLoading,
+      adminUnlocked,
+      deleteDialog,
+      deletingRoom,
+      openAdminDialog,
+      unlockAdmin,
+      lockAdmin,
+      requestRoomDeletion,
+      deleteRoom,
     };
   },
 });
@@ -548,6 +720,13 @@ h1 {
   gap: 10px;
   margin-bottom: 14px;
 }
+.admin-entry {
+  margin-left: auto;
+  color: #111;
+  background: #f2f5f8;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .rooms-heading h2 {
   font-size: 21px;
   font-weight: 700;
@@ -602,6 +781,42 @@ h1 {
 .games-list {
   container: lobby-games / inline-size;
   display: grid;
+  gap: 8px;
+}
+.room-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+}
+.room-list-item > .game {
+  min-width: 0;
+}
+.room-delete {
+  min-height: 44px;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.admin-dialog .admin-help {
+  margin: 0 0 16px;
+  color: rgba(var(--v-theme-text-primary), 0.72);
+  line-height: 1.6;
+}
+.admin-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+.admin-status--success {
+  color: rgb(var(--v-theme-success));
+  background: rgba(var(--v-theme-success), 0.1);
+}
+.admin-actions {
+  justify-content: flex-end;
   gap: 8px;
 }
 .show-more {
@@ -707,6 +922,22 @@ a:focus-visible {
     padding: 8px;
     gap: 5px;
     font-size: 12px;
+  }
+  .rooms-heading {
+    align-items: flex-start;
+  }
+  .admin-entry {
+    margin-top: -6px;
+    padding-inline: 4px;
+  }
+  .room-list-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .room-delete {
+    justify-self: end;
+    margin-top: -2px;
+    margin-right: 4px;
   }
 }
 </style>

@@ -817,7 +817,7 @@ export class AiService {
             result: room.stage === 'started' ? room.game.result : undefined,
           }));
         const rooms = [...new Map([...archived, ...live].map((room) => [room.uuid, room])).values()]
-          .filter((room) => room.aiStatus !== 'stopped')
+          .filter((room) => room.aiStatus !== 'stopped' && !this.manager.isLobbyRoomRemoved?.(room.uuid))
           .sort((a, b) => Date.parse(b.createAt) - Date.parse(a.createAt))
           .slice(0, 20);
         cb({ rooms });

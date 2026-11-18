@@ -87,6 +87,10 @@ function validCustomRules(value: unknown): boolean {
 
 // Required ack position is a protocol property, independent of a listener's JS arity.
 const acknowledgements: Record<string, number> = {
+  getRoomAdminStatus: 0,
+  lockRoomAdmin: 0,
+  unlockRoomAdmin: 1,
+  deleteLobbyRoom: 1,
   getRoomsList: 0,
   getTotalStats: 0,
   getAiRoomsList: 0,
@@ -178,6 +182,7 @@ export function validPacket(event: string, args: unknown[]): boolean {
   const values = ack !== undefined ? args.slice(0, ack) : args;
   if (values.length > 4) return false;
   if (event === 'setAiBotQuotaThresholds') return validBotQuotaThresholds(values[0]);
+  if (event === 'unlockRoomAdmin') return typeof values[0] === 'string' && values[0].length <= 128;
   if (event === 'consumeAiBotReset') return validBotResetRequest(values[0]);
   if (!nonIDs.has(event) && values.length && !validID(values[0])) return false;
   if (event === 'getPlayerGameSummariesPage')

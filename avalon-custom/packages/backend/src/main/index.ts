@@ -44,10 +44,16 @@ export class Manager {
   chatService: ChatService;
   rooms: Dictionary<Room> = Object.create(null);
   roomsList: TRoomsList = [];
+  private removedLobbyRooms = new Set<string>();
+  private roomAdminSessions = new WeakMap<ServerSocket, number>();
   private roomTimers = new Map<string, NodeJS.Timeout>();
   io: Server;
   dbManager: DBManager;
   onlineCounter: Dictionary<number> = Object.create(null);
+
+  isLobbyRoomRemoved(uuid: string): boolean {
+    return this.removedLobbyRooms.has(uuid);
+  }
 
   get roomListCutted() {
     return this.roomsList.slice(0, 20);
@@ -88,7 +94,7 @@ export class Manager {
   updateRoomsList(roomOrID: Room | string, removeRoom: boolean = false) {
     const room = typeof roomOrID === 'string' ? this.rooms[roomOrID] : roomOrID;
 
-    if (!room) {
+    if (!room || this.removedLobbyRooms.has(room.roomID)) {
       return;
     }
 
@@ -166,7 +172,7 @@ export class Manager {
 
     // Existing live entries take precedence if a room was created during startup loading.
     this.roomsList = [...new Map([...roomsInfo, ...this.roomsList].map((room) => [room.uuid, room])).values()]
-      .filter((room) => room.aiStatus !== 'stopped' && this.rooms[room.uuid]?.ai?.status !== 'stopped')
+      .filter((room) => !this.removedLobbyRooms.has(room.uuid) && room.aiStatus !== 'stopped' && this.rooms[room.uuid]?.ai?.status !== 'stopped')
       .sort((a, b) => Date.parse(b.createAt) - Date.parse(a.createAt))
       .slice(0, 50);
     this.io.to('lobby').emit('roomsListUpdated', this.roomListCutted);
@@ -246,6 +252,7 @@ export class Manager {
     clearTimeout(this.roomTimers.get(uuid));
     this.roomTimers.delete(uuid);
     const room = this.rooms[uuid];
+    room?.stopBuiltinBots?.();
     if (room?.data.stage === 'started') {
       room.data.manager.game.stateObserver.gameStateChanged = () => {};
       room.data.manager.game.timer.cleanup();
@@ -283,7 +290,15 @@ export class Manager {
     void Promise.allSettled([
       this.dbManager.getLastRooms(20),
       this.aiService.archiveRepository?.recent(20) || Promise.resolve([]),
-    ]).then((results) => {
+    ]).then(async (results) => {
+      try {
+        if (this.dbManager.dbInstance?.connection.db) {
+          for (const id of await this.dbManager.getRemovedLobbyRooms()) this.removedLobbyRooms.add(id);
+        }
+      } catch {
+        console.error('Could not load removed lobby rooms');
+        return;
+      }
       this.generateRoomsListFromDB(results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])));
       if (results.some((result) => result.status === 'rejected'))
         console.error('Could not load part of the saved rooms list');
@@ -459,6 +474,40 @@ export class Manager {
   }
 
   createMethodsForRoom(socket: ServerSocket, userID: string): void {
+    const hasRoomAdmin = () => (this.roomAdminSessions.get(socket) ?? 0) > Date.now();
+    socket.on('getRoomAdminStatus', (cb) => cb(hasRoomAdmin()));
+    socket.on('lockRoomAdmin', (cb) => {
+      this.roomAdminSessions.delete(socket);
+      cb(true);
+    });
+    socket.on('unlockRoomAdmin', (password, cb) => {
+      const expected = process.env.XCGAME_ROOM_ADMIN_PASSWORD;
+      const hash = (value: string) => crypto.createHash('sha256').update(value).digest();
+      const matches = Boolean(expected && crypto.timingSafeEqual(hash(expected), hash(password)));
+      if (matches) this.roomAdminSessions.set(socket, Date.now() + 8 * 60 * 60 * 1000);
+      cb(matches);
+    });
+    socket.on('deleteLobbyRoom', async (uuid, cb) => {
+      if (!hasRoomAdmin()) return cb({ error: 'forbidden' });
+      try {
+        if (
+          !this.rooms[uuid] &&
+          !this.roomsList.some((room) => room.uuid === uuid) &&
+          !(await this.aiService.archiveRepository?.load(uuid))
+        ) return cb(false);
+        await this.dbManager.markLobbyRoomRemoved(uuid);
+        this.removedLobbyRooms.add(uuid);
+        const room = this.rooms[uuid];
+        if (room instanceof BotRoom && room.ai?.status !== 'finished') room.stop();
+        if (room) this.releaseRoom(uuid);
+        this.roomsList = this.roomsList.filter((room) => room.uuid !== uuid);
+        this.io.to('lobby').emit('roomsListUpdated', this.roomListCutted);
+        cb(true);
+      } catch {
+        cb({ error: 'requestFailed' });
+      }
+    });
+
     socket.on('getMyProfile', async (cb) => {
       cb(await this.dbManager.getUserProfile(userID));
     });

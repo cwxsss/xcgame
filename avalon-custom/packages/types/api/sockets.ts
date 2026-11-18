@@ -106,6 +106,10 @@ export interface ClientToServerEvents extends ClientToServerUserEvents, TrueSkil
   ) => void;
   getPlayerGames: (uuid: string, callback: (games: VisualGameState[] | ISocketError) => void) => void;
   getAiRoomsList: (callback: (result: { rooms: TRoomsList } | { error: string }) => void) => void;
+  getRoomAdminStatus: (callback: (result: boolean | ISocketError) => void) => void;
+  lockRoomAdmin: (callback: (result: boolean | ISocketError) => void) => void;
+  unlockRoomAdmin: (password: string, callback: (result: boolean | ISocketError) => void) => void;
+  deleteLobbyRoom: (uuid: string, callback: (result: boolean | ISocketError) => void) => void;
   getRoomsList: (callback: (list: TRoomsList | ISocketError) => void) => void;
   getOnlineCounter: (id: string, callback: (counter: number | ISocketError) => void) => void;
   getUserProfile: (id: string, callback: (user: PublicUserProfile | ISocketError) => void) => void;

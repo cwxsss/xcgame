@@ -17,10 +17,10 @@
         <circle cx="15" cy="12" r="1" fill="currentColor" />
       </svg>
     </span>
-    <span
+    <PlayerIcon
       v-else-if="game.result?.winner"
       class="game-emblem"
-      :class="`${game.result.winner}-loyalty-icon`"
+      :icon="game.result.winner"
       aria-hidden="true"
     />
     <span v-else class="game-emblem material-icons room-icon" aria-hidden="true">{{
@@ -61,7 +61,7 @@
       <template v-if="game.ai">
         <span class="ai-status" :class="{ 'ai-status--live': game.aiStatus === 'running' }">
           <i v-if="game.aiStatus === 'running'" aria-hidden="true"></i>
-          <span v-else-if="game.result?.winner" :class="`${game.result.winner}-loyalty-icon`" aria-hidden="true"></span>
+          <PlayerIcon v-else-if="game.result?.winner" class="ai-winner" :icon="game.result.winner" aria-hidden="true" />
           {{ aiStatusLabel }}
         </span>
       </template>
@@ -84,6 +84,7 @@ import { useI18n } from 'vue-i18n';
 import type { TRoomInfo } from '@avalon/types';
 import { useUserProfile } from '@/helpers/composables';
 import OptionsPreview from '@/components/view/information/OptionsPreview.vue';
+import PlayerIcon from '@/components/view/information/PlayerIcon.vue';
 
 const props = defineProps<{ game: TRoomInfo }>();
 const hostID = computed(() => props.game.hostID);
@@ -319,9 +320,7 @@ const action = computed(() => (game.value.result ? 'viewGame' : canJoin.value ? 
 .game:hover .room-link--join {
   background: rgba(var(--v-theme-primary), 0.14);
 }
-@import '@/styles/loyalty-icons.scss';
-.game-status .evil-loyalty-icon,
-.game-status .good-loyalty-icon {
+.game-status .ai-winner {
   width: 18px;
   height: 18px;
   flex-shrink: 0;

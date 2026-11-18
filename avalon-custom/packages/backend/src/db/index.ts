@@ -101,6 +101,21 @@ export class DBManager extends UserLayer {
     };
   }
 
+  private get removedLobbyRooms() {
+    const db = this.dbInstance?.connection.db;
+    if (!db) throw Error('requestFailed');
+    return db.collection<{ _id: string }>('removed_lobby_rooms');
+  }
+
+  async getRemovedLobbyRooms(): Promise<string[]> {
+    return this.removedLobbyRooms.distinct('_id');
+  }
+
+  async markLobbyRoomRemoved(roomID: string): Promise<void> {
+    validateID(roomID);
+    await this.removedLobbyRooms.updateOne({ _id: roomID }, { $setOnInsert: { _id: roomID } }, { upsert: true });
+  }
+
   async getLastRooms(amount: number): Promise<StartedRoomState[]> {
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100) throw new Error('Invalid room limit');
     const rooms = await roomModel.find().sort({ _id: -1 }).limit(amount).maxTimeMS(10000);

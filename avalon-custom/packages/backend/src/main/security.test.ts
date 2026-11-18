@@ -207,6 +207,38 @@ test('guest cannot subscribe arrays or private channel names; valid archives use
   expect([...socket.rooms]).toEqual(['socket', 'room:archive']);
 });
 
+test('room administration is socket scoped and removes only the selected lobby room', async () => {
+  const { manager, handlers, broadcasts } = fixture(true);
+  const previousPassword = process.env.XCGAME_ROOM_ADMIN_PASSWORD;
+  process.env.XCGAME_ROOM_ADMIN_PASSWORD = 'test-admin-pass';
+  const markRemoved = jest.fn(async () => {});
+  manager.dbManager.markLobbyRoomRemoved = markRemoved;
+  try {
+    manager.createRoom('admin-test-room', 'bob', ['bob']);
+    manager.createRoom('other-room', 'carol', ['carol']);
+    const ack = jest.fn();
+    await handlers.deleteLobbyRoom('admin-test-room', ack);
+    expect(ack).toHaveBeenLastCalledWith({ error: 'forbidden' });
+    handlers.unlockRoomAdmin('wrong-password', ack);
+    expect(ack).toHaveBeenLastCalledWith(false);
+    handlers.unlockRoomAdmin('test-admin-pass', ack);
+    expect(ack).toHaveBeenLastCalledWith(true);
+    await handlers.deleteLobbyRoom('admin-test-room', ack);
+    expect(ack).toHaveBeenLastCalledWith(true);
+    expect(markRemoved).toHaveBeenCalledWith('admin-test-room');
+    expect(manager.rooms['admin-test-room']).toBeUndefined();
+    expect(manager.rooms['other-room']).toBeDefined();
+    expect(manager.isLobbyRoomRemoved('admin-test-room')).toBe(true);
+    expect(broadcasts).toContainEqual({ channel: 'room:admin-test-room', event: 'destroyRoom', value: 'admin-test-room' });
+    jest.advanceTimersByTime(8 * 60 * 60 * 1000);
+    handlers.getRoomAdminStatus(ack);
+    expect(ack).toHaveBeenLastCalledWith(false);
+  } finally {
+    if (previousPassword === undefined) delete process.env.XCGAME_ROOM_ADMIN_PASSWORD;
+    else process.env.XCGAME_ROOM_ADMIN_PASSWORD = previousPassword;
+  }
+});
+
 test('authenticated users join only their namespaced personal channel', () => {
   expect([...fixture(true).socket.rooms]).toEqual(['socket', 'user:alice']);
 });
