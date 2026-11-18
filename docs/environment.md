@@ -1,0 +1,71 @@
+# Настройки окружения backend
+
+[Documentation index](README.md)
+
+## Какие файлы нужны
+
+- `packages/backend/.env.development` — готовые настройки локальной разработки; их использует `npm run dev`.
+- `packages/backend/.env.production` — локальный production-файл, исключённый из Git. При запуске через Docker значения можно передать через `environment` или `env_file` вместо хранения секретов в образе.
+- `packages/backend/.env.example` — справочный шаблон с пояснениями; автоматически не загружается.
+- `packages/backend/.env.local` — необязательные локальные настройки и секреты, исключённые из Git.
+
+В development backend сначала читает `.env.local`, затем `.env.<NODE_ENV>` (по умолчанию `.env.development`). В production `.env.local` не читается: используются переменные процесса и `.env.production`. Уже заданные переменные процесса имеют высший приоритет; в development далее идут `.env.local` и файл выбранного окружения. Пути считаются относительно рабочей директории backend. Команды проекта запускают backend из `packages/backend` и задают нужный `NODE_ENV`.
+
+## Основные параметры
+
+| Параметр                           | Назначение                                                                                                       |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                         | `development` для разработки, `production` для рабочего сайта. Команды запуска проекта задают его автоматически. |
+| `MONGODB_HOST`                     | Хост базы; в контейнере — имя сервиса MongoDB, если база находится в той же Docker-сети.                         |
+| `MONGODB_PORT`                     | Порт базы: обычно `27017`; с хоста в dev используйте опубликованный порт.                                        |
+| `DB_NAME`                          | Имя базы приложения.                                                                                             |
+| `MONGODB_USER`, `MONGODB_PASSWORD` | Учетные данные базы. Их нельзя менять только ради уборки конфигурации.                                           |
+| `SECRET_KEY`                       | Ключ подписи токенов авторизации. Сохраняйте текущий production-ключ; его замена повлияет на действующие сессии. |
+
+Dev Compose использует те же параметры MongoDB через `--env-file packages/backend/.env.development`. Он запускает базу и mongo-express; backend запускается отдельно.
+
+## Необязательные возможности
+
+**Почта.** Без `MAIL_ENABLED=true` восстановление пароля по почте выключено. Для включения нужны SMTP-доступы, адрес отправителя, адрес сайта и два отдельных секрета. Для FirstByte или другого провайдера задайте `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` и `SMTP_PASSWORD`; порт 465 использует TLS сразу, остальные порты требуют STARTTLS. Без новых параметров сохраняется прежняя конфигурация Postbox через `POSTBOX_SMTP_USER` и `POSTBOX_SMTP_PASSWORD`. При смене провайдера сохраните `MAIL_ENCRYPTION_KEY`, иначе уже поставленные в очередь письма не расшифруются. Комментарии в `.env.example` поясняют каждое поле; инструкция Postbox — [восстановление пароля](password-recovery.md). Лимиты по умолчанию: 1000 писем в час и 5000 в день; ограничьте их квотой выбранного провайдера. `MAIL_TEST_RECIPIENTS` ограничивает отправку указанными адресами, если задан.
+
+**Прокси.** `TRUSTED_PROXY_CIDRS` перечисляет доверенные IP/CIDR reverse proxy. При прямом доступе не нужен. Существующее значение на сервере следует сохранить.
+
+**Голосовой чат.** `VOICE_ENABLED=false` выключает beta-функцию по умолчанию. Для включения нужны `LIVEKIT_API_KEY` и `LIVEKIT_API_SECRET` из закрытой конфигурации LiveKit, `LIVEKIT_INTERNAL_URL` для приватного API (`http://127.0.0.1:7880` при размещении на одной машине или VPC-адрес media VM) и `LIVEKIT_PUBLIC_URL` вида `wss://voice.example.com/` для клиента. `VOICE_GATEWAY_PORT=7882` и `VOICE_GATEWAY_HOST=127.0.0.1` задают отдельный listener signaling-шлюза. Для backend в Docker задайте `VOICE_GATEWAY_HOST=0.0.0.0` внутри контейнера, предоставьте nginx доступ через Docker-сеть и опубликуйте TCP `7882` **только** на приватном VPC IP backend VM для health watchdog на media VM. Security group и host firewall должны пропускать к этому порту лишь media VM. Внешний TLS-прокси направляет к шлюзу только четыре RTC пути. Полная схема, firewall и проверки приведены в [инструкции голоса](voice-chat.md).
+
+**Донаты.** Дополнительные параметры не нужны. Четыре адреса кошельков и публичные API встроены в код. Возможные переопределения `SUPPORT_*` и необязательный ключ TronGrid описаны в [настройке донатов](payments/direct-crypto.md).
+
+Удалённые `NOWPAYMENTS_*`, `OXAPAY_*`, `SUPPORT_FRONTEND_URL`, `DIRECT_SUPPORT_ENABLED` и `PREMIUM_COSMETICS_ENABLED` больше не используются. Указывать их в окружении контейнера не требуется.
+
+Изменения файлов окружения требуют перезапуска backend. Изменения `environment`/`env_file` в Compose требуют пересоздания контейнера.
+
+**AI-комнаты.** По умолчанию выключены. Параметры Codex, проверка `isAdmin` в базе
+и лимиты подписки описаны в [инструкции AI-комнат](ai-rooms.md).
+
+## AI, Codex и хранение диагностики
+
+| Параметр                                       | Назначение / значение по умолчанию                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `AI_ROOMS_ENABLED`                             | `true` включает создание AI-комнат при настроенном Codex               |
+| `AI_CODEX_ENABLED`                             | Явное `true` включает Codex в development или production               |
+| `AI_CODEX_BIN`, `AI_CODEX_HOME`                | Путь локального CLI и профиля авторизации                              |
+| `AI_CODEX_SSH_HOST`                            | Выбирает удалённый worker вместо локального CLI                        |
+| `AI_CODEX_SSH_PORT`, `AI_CODEX_SSH_USER`       | Порт SSH (по умолчанию 10022) и выделенный пользователь                |
+| `AI_CODEX_SSH_KEY`, `AI_CODEX_SSH_KNOWN_HOSTS` | Пути ключа и проверенного known_hosts; оба обязательны для remote mode |
+| `AI_CODEX_SSH_BIN`                             | Необязательный путь SSH-клиента; по умолчанию `ssh`                    |
+| `AI_TRACE_RETENTION_DAYS`                      | 30 дней для новых приватных traces                                     |
+| `AI_REQUEST_RETENTION_DAYS`                    | 365 дней для подтверждённых request logs                               |
+
+AI Arena поддерживает только Codex с авторизацией ChatGPT. Модель и reasoning
+выбираются из каталога worker. Платного API fallback нет.
+TTL диагностики не удаляет replay и исторические данные.
+Подробнее: [AI Arena](ai-rooms.md), [Codex production](../deploy/codex-production.md),
+[учёт и retention](ai-storage-retention.md).
+
+## UI и сборка
+
+UI использует собственные build-настройки, а не backend `.env.local`.
+`AVALON_IMAGE_SOURCE=local npm run build:ui` собирает preview с локальными
+изображениями; такой manifest нельзя отправлять cloud uploader.
+`PUPPETEER_EXECUTABLE_PATH` выбирает установленный Chrome для build-проверок;
+`MONGOMS_SYSTEM_BINARY` выбирает локальный mongod только для integration-тестов.
+Эти параметры не являются production-секретами приложения.

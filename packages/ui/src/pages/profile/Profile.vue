@@ -1,0 +1,1108 @@
+<template>
+  <div class="profile-page-wrapper">
+    <div v-if="$store.state.profile" class="profile-page">
+      <h1 class="page-title">{{ $t('profile.profile') }}</h1>
+      <!-- Секция профиля -->
+      <v-card class="profile-card profile-summary" elevation="0">
+        <v-card-text>
+          <div class="profile-header">
+            <div class="profile-avatar">
+              <button
+                type="button"
+                @click="openAvatarModal"
+                class="avatar-button"
+                :aria-label="$t('profile.changeAvatar')"
+              >
+                <Avatar class="avatar" :avatarID="$store.state.profile.avatar" alt="" />
+                <span class="avatar-edit"><span class="material-icons" aria-hidden="true">photo_camera</span></span>
+              </button>
+              <button type="button" @click="openAvatarModal" class="avatar-link">
+                {{ $t('profile.changeAvatar') }}
+              </button>
+            </div>
+            <div class="profile-info">
+              <div class="profile-name-row">
+                <h2 class="profile-name">{{ $store.state.profile.name || $store.state.profile.login }}</h2>
+                <div v-if="!ratingLoading && trueSkillRating" class="profile-rating">
+                  <UserTrueSkillRating :userID="$store.state.profile.id" appearance="plain" />
+                </div>
+              </div>
+              <div class="profile-login">{{ $store.state.profile.login }}</div>
+              <UserProfileDetails :uuid="$store.state.profile.id" />
+            </div>
+          </div>
+          <div class="profile-actions">
+            <v-btn class="action-btn" size="large" @click="goToStats" variant="tonal" color="primary">
+              <template v-slot:prepend>
+                <span class="material-icons" aria-hidden="true">analytics</span>
+              </template>
+              {{ $t('profile.stats') }}
+            </v-btn>
+            <v-btn class="action-btn" size="large" @click="goToAchievements" variant="tonal" color="primary">
+              <template v-slot:prepend>
+                <span class="material-icons" aria-hidden="true">emoji_events</span>
+              </template>
+              {{ $t('menu.achievements') }}
+            </v-btn>
+            <v-btn
+              class="action-btn logout-btn"
+              size="large"
+              color="primary"
+              variant="text"
+              @click="logout"
+              prepend-icon="logout"
+            >
+              {{ $t('profile.logout') }}
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <div class="profile-grid">
+        <!-- Секция аккаунта -->
+        <v-card class="profile-card" elevation="0">
+          <v-card-title tag="h2" class="card-header">
+            <span class="material-icons">manage_accounts</span>
+            {{ $t('profile.account') }}
+          </v-card-title>
+          <v-card-text>
+            <form class="name-form" @submit.prevent="update">
+              <v-text-field
+                hide-details="auto"
+                v-model="username"
+                :rules="[validators.name]"
+                :label="$t('profile.username')"
+                class="name-field"
+                autocomplete="nickname"
+                variant="outlined"
+                density="comfortable"
+              >
+              </v-text-field>
+              <v-btn :disabled="!updateAvailable" type="submit" variant="tonal" color="primary" class="save-name">
+                {{ $t('profile.change') }}
+              </v-btn>
+            </form>
+            <div class="credential-row">
+              <div class="credential-info">
+                <span class="field-label">{{ $t('modal.login') }}</span
+                ><span>{{ $store.state.profile.login }}</span>
+              </div>
+              <v-btn variant="text" color="primary" @click="updateLogin" :aria-label="$t('modal.changelogin')">{{
+                $t('profile.change')
+              }}</v-btn>
+            </div>
+            <div class="credential-row">
+              <div class="credential-info">
+                <span class="field-label">{{ $t('modal.email') }}</span
+                ><span>{{ $store.state.profile.email }}</span>
+              </div>
+              <v-btn variant="text" color="primary" @click="updateEmail" :aria-label="$t('modal.changeemail')">{{
+                $t('profile.change')
+              }}</v-btn>
+            </div>
+            <v-btn variant="outlined" color="primary" @click="updatePassword" class="w-100 password-btn">
+              <template v-slot:prepend>
+                <span class="material-icons">lock</span>
+              </template>
+              {{ $t('profile.changePassword') }}
+            </v-btn>
+          </v-card-text>
+        </v-card>
+
+        <!-- Секция настроек -->
+        <v-card class="profile-card" elevation="0">
+          <v-card-title tag="h2" class="card-header">
+            <span class="material-icons">settings</span>
+            {{ $t('profile.settings') }}
+          </v-card-title>
+          <v-card-text>
+            <p class="section-hint">{{ $t('profile.autoSaveHint') }}</p>
+            <v-select
+              :label="$t('profile.language')"
+              :items="availableLocales"
+              class="w-100 mb-3"
+              v-model="locale"
+              hide-details="auto"
+              variant="outlined"
+              density="comfortable"
+            ></v-select>
+            <v-select
+              :label="$t('profile.colorTheme')"
+              :items="availableThemes"
+              class="w-100 mb-3"
+              v-model="colorTheme"
+              hide-details="auto"
+              variant="outlined"
+              density="comfortable"
+            ></v-select>
+            <fieldset class="image-style-fieldset" aria-describedby="image-style-hint image-style-note">
+              <legend>{{ $t('profile.imageStyle') }}</legend>
+              <p id="image-style-hint" class="image-style-hint">{{ $t('profile.imageStyleHint') }}</p>
+              <div class="image-style-options">
+                <button
+                  v-for="style in availableStyles"
+                  :key="style.value"
+                  type="button"
+                  class="image-style-option"
+                  :aria-pressed="imageStyle === style.value"
+                  @click="imageStyle = style.value"
+                >
+                  <img
+                    :src="style.image"
+                    :alt="$t('profile.imageStylePreview', { role: $t('roles.merlin'), style: style.title })"
+                    width="160"
+                    height="200"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span v-if="imageStyle === style.value" class="image-style-check material-icons" aria-hidden="true">
+                    check
+                  </span>
+                  <span class="image-style-copy">
+                    <span class="image-style-title">{{ style.title }}</span>
+                    <span class="image-style-description">{{ style.description }}</span>
+                  </span>
+                </button>
+              </div>
+              <p id="image-style-note" class="image-style-note">{{ $t('profile.imageStyleNote') }}</p>
+            </fieldset>
+
+            <div class="settings-divider"></div>
+            <div class="settings-subtitle">{{ $t('profile.gameSettings') }}</div>
+
+            <v-switch
+              color="primary"
+              inset
+              v-model="hideSpoilers"
+              :hide-details="true"
+              :label="$t('profile.hideSpoilersHint')"
+              density="comfortable"
+            ></v-switch>
+            <v-switch
+              color="primary"
+              inset
+              v-model="hideIndexInHistory"
+              :hide-details="true"
+              :label="$t('profile.hideIndexHint')"
+              density="comfortable"
+            ></v-switch>
+          </v-card-text>
+        </v-card>
+      </div>
+      <v-card class="profile-card collection-card" elevation="0"><StickerCollection /></v-card>
+
+      <!-- Опасная зона -->
+      <v-card v-if="!ratingLoading && trueSkillRating" class="profile-card danger-zone" elevation="0">
+        <v-card-title tag="h2" class="card-header danger-header">
+          <span class="material-icons">warning</span>
+          {{ $t('profile.dangerZone') }}
+        </v-card-title>
+        <v-card-text>
+          <!-- Сброс рейтинга -->
+          <div v-if="!ratingLoading && trueSkillRating" class="danger-item">
+            <div class="danger-info">
+              <div class="danger-title">{{ $t('profile.resetRating') }}</div>
+              <div class="danger-description">{{ $t('profile.resetRatingHint') }}</div>
+              <div class="danger-description">
+                {{
+                  $t(resetCooldownMonths === 1 ? 'profile.resetRatingCooldownPremium' : 'profile.resetRatingCooldown')
+                }}
+              </div>
+              <div v-if="!canResetRating" class="danger-cooldown">
+                {{ $t('profile.nextResetAvailable') }}: {{ formatNextResetDate }}
+              </div>
+            </div>
+            <v-btn
+              color="error"
+              variant="outlined"
+              @click="confirmResetRating"
+              :disabled="!canResetRating"
+              :loading="ratingResetLoading"
+            >
+              {{ $t('profile.resetRating') }}
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </div>
+
+    <AvatarModal ref="avatarModal" />
+
+    <v-dialog
+      v-model="logoutDialog"
+      max-width="420px"
+      aria-labelledby="logout-dialog-title"
+      aria-describedby="logout-dialog-description"
+    >
+      <v-card class="logout-dialog">
+        <v-card-title id="logout-dialog-title" class="dialog-title">{{ $t('profile.logoutTitle') }}</v-card-title>
+        <v-card-text id="logout-dialog-description" class="dialog-text">
+          {{ $t('profile.logoutConfirmText') }}
+        </v-card-text>
+        <v-card-actions class="dialog-actions">
+          <v-btn color="primary" variant="tonal" class="dialog-btn" autofocus @click="logoutDialog = false">
+            {{ $t('modal.cancel') }}
+          </v-btn>
+          <v-btn color="primary" variant="flat" class="dialog-btn" @click="confirmLogout">
+            {{ $t('profile.logout') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Модальное окно подтверждения сброса рейтинга -->
+    <v-dialog v-model="resetRatingDialog" max-width="420px">
+      <v-card class="reset-rating-dialog">
+        <v-card-title class="dialog-title">
+          <span class="material-icons warning-icon">warning</span>
+          {{ $t('profile.resetRatingConfirmTitle') }}
+        </v-card-title>
+        <v-card-text class="dialog-text">
+          {{
+            $t(resetCooldownMonths === 1 ? 'profile.resetRatingConfirmTextPremium' : 'profile.resetRatingConfirmText')
+          }}
+        </v-card-text>
+        <v-card-actions class="dialog-actions">
+          <v-btn color="primary" variant="tonal" @click="resetRatingDialog = false" class="dialog-btn">
+            {{ $t('modal.cancel') }}
+          </v-btn>
+          <v-btn color="error" variant="elevated" @click="resetRating" :loading="ratingResetLoading" class="dialog-btn">
+            {{ $t('profile.resetRating') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </div>
+</template>
+
+<script lang="ts">
+import { localizedPath } from '@/router/paths';
+import { i18n } from '@/plugins/i18n';
+import { chooseLanguage } from '@/helpers/i18n/preference';
+import { getImagePathByID } from '@/helpers/images';
+import { defineComponent } from 'vue';
+import { LanguageMap } from '@/helpers/i18n';
+import { store } from '@/store';
+import eventBus from '@/helpers/event-bus';
+import { RouteLocationNormalized, NavigationGuardNext } from 'vue-router';
+import StickerCollection from '@/components/stickers/StickerCollection.vue';
+import Avatar from '@/components/user/Avatar.vue';
+import AvatarModal from '@/components/user/AvatarModal.vue';
+import { socket } from '@/api/socket';
+import { validators } from '@/helpers/validators';
+import UserTrueSkillRating from '@/components/stats/UserTrueSkillRating.vue';
+import UserProfileDetails from '@/components/stats/UserProfileDetails.vue';
+import type { PlayerTrueSkillRating } from '@avalon/types';
+
+export default defineComponent({
+  name: 'Profile',
+  components: {
+    StickerCollection,
+    Avatar,
+    AvatarModal,
+    UserTrueSkillRating,
+    UserProfileDetails,
+  },
+  data() {
+    const { profile } = this.$store.state;
+
+    return {
+      username: profile?.name || '',
+      validators,
+      updatingName: false,
+      logoutDialog: false,
+      availableLocales: Object.entries(LanguageMap).map(([value, title]) => ({
+        value,
+        title,
+      })),
+      // Добавляем новые поля для функционала сброса рейтинга
+      resetRatingDialog: false,
+      nextResetDate: null as Date | null,
+      resetCooldownMonths: 3 as 1 | 3,
+      ratingResetLoading: false,
+      trueSkillRating: null as PlayerTrueSkillRating | null,
+      ratingLoading: true,
+    };
+  },
+  mounted() {
+    const initialName = this.username;
+    this.$store.dispatch('refreshProfile').then(() => {
+      if (this.username === initialName) this.username = this.$store.state.profile?.name || '';
+    });
+    // Добавляем проверку возможности сброса рейтинга и загрузку данных о рейтинге
+    this.checkResetRatingAvailability();
+  },
+  computed: {
+    hideSpoilers: {
+      get() {
+        return this.$store.state.hideSpoilers;
+      },
+      set(value: boolean) {
+        this.$store.commit('updateHideSpoilers', value);
+      },
+    },
+    locale: {
+      get() {
+        return this.$i18n.locale;
+      },
+      set(value: string) {
+        void chooseLanguage(value);
+      },
+    },
+    hideIndexInHistory: {
+      get() {
+        return Boolean(this.$store.state.settings?.hideIndexInHistory);
+      },
+      set(value: boolean) {
+        this.$store.commit('updateUserSettings', { key: 'hideIndexInHistory', value });
+      },
+    },
+    colorTheme: {
+      get() {
+        return this.$store.state.settings?.colorTheme || 'light';
+      },
+      set(value: 'light' | 'dark') {
+        this.$store.commit('updateUserSettings', { key: 'colorTheme', value });
+        // @ts-ignore
+        this.$vuetify.theme.global.name = value === 'dark' ? 'darkTheme' : 'lightTheme';
+      },
+    },
+    imageStyle: {
+      get() {
+        return this.$store.state.settings?.style || 'default';
+      },
+      set(value: 'default' | 'legacy' | 'anime') {
+        this.$store.commit('updateUserSettings', { key: 'style', value });
+      },
+    },
+    updateAvailable() {
+      return (
+        !this.updatingName &&
+        validators.name(this.username.trim()) === true &&
+        this.$store.state.profile?.name !== this.username.trim()
+      );
+    },
+    availableThemes() {
+      return [
+        {
+          value: 'light',
+          title: this.$t('profile.lightTheme'),
+        },
+        {
+          value: 'dark',
+          title: this.$t('profile.darkTheme'),
+        },
+      ];
+    },
+    availableStyles() {
+      return [
+        {
+          value: 'default' as const,
+          title: this.$t('profile.styleDefault'),
+          description: this.$t('profile.styleDefaultDescription'),
+          image: getImagePathByID('roles', 'merlin'),
+        },
+        {
+          value: 'legacy' as const,
+          title: this.$t('profile.styleLegacy'),
+          description: this.$t('profile.styleLegacyDescription'),
+          image: getImagePathByID('roles/legacy', 'merlin'),
+        },
+        {
+          value: 'anime' as const,
+          title: this.$t('profile.styleAnime'),
+          description: this.$t('profile.styleAnimeDescription'),
+          image: getImagePathByID('roles/anime', 'merlin'),
+        },
+      ];
+    },
+    // Добавляем новые вычисляемые свойства для функционала сброса рейтинга
+    canResetRating() {
+      return !this.nextResetDate || new Date() >= new Date(this.nextResetDate);
+    },
+
+    formatNextResetDate() {
+      if (!this.nextResetDate) return '';
+      return new Date(this.nextResetDate).toLocaleDateString();
+    },
+  },
+  methods: {
+    openAvatarModal() {
+      (this.$refs.avatarModal as typeof AvatarModal).displayModal();
+    },
+    logout() {
+      this.logoutDialog = true;
+    },
+    confirmLogout() {
+      if (!this.logoutDialog) return;
+      this.logoutDialog = false;
+      this.$router.push(localizedPath('/', i18n.global.locale.value));
+      this.$store.commit('clearUserProfile');
+    },
+    updateEmail() {
+      eventBus.emit('openCredentialsModal', 'email');
+    },
+    updateLogin() {
+      eventBus.emit('openCredentialsModal', 'login');
+    },
+    updatePassword() {
+      eventBus.emit('openCredentialsModal', 'password');
+    },
+    goToStats() {
+      this.$router.push({ name: 'user_stats', params: { uuid: this.$store.state.profile!.id } });
+    },
+    goToAchievements() {
+      this.$router.push({ name: 'user_achievements', params: { uuid: this.$store.state.profile!.id } });
+    },
+    async update() {
+      if (!this.updateAvailable) return;
+      this.username = this.username.trim();
+      this.updatingName = true;
+      try {
+        const result = await this.$store.dispatch('updateUserName', { name: this.username });
+        if (result !== true) eventBus.emit('infoMessage', this.$t('errors.' + result.error));
+      } catch {
+        eventBus.emit('infoMessage', this.$t('errors.requestFailed'));
+      } finally {
+        this.updatingName = false;
+      }
+    },
+
+    // Добавляем новые методы для функционала сброса рейтинга
+    confirmResetRating() {
+      this.resetRatingDialog = true;
+    },
+
+    resetRating() {
+      if (!this.$store.state.profile || this.ratingResetLoading || !this.canResetRating) return;
+      this.ratingResetLoading = true;
+
+      socket.emit('resetTrueSkillRating', this.$store.state.profile.id, (response) => {
+        this.ratingResetLoading = false;
+        this.resetRatingDialog = false;
+
+        if (response.success) {
+          // Показываем уведомление об успешном сбросе
+          eventBus.emit('infoMessage', this.$t('infoMessage.ratingReset'));
+
+          // Обновляем профиль пользователя
+          this.$store.dispatch('refreshProfile');
+
+          // Обновляем информацию о возможности сброса рейтинга
+          this.checkResetRatingAvailability();
+        } else {
+          // Показываем уведомление об ошибке
+          eventBus.emit(
+            'infoMessage',
+            response.nextResetAvailableAt
+              ? this.$t(
+                  this.resetCooldownMonths === 1 ? 'profile.resetRatingCooldownPremium' : 'profile.resetRatingCooldown',
+                )
+              : this.$t('infoMessage.ratingResetError'),
+          );
+
+          // Если есть дата следующего возможного сброса, сохраняем её
+          if (response.nextResetAvailableAt) {
+            this.nextResetDate = new Date(response.nextResetAvailableAt);
+          }
+        }
+      });
+    },
+
+    checkResetRatingAvailability() {
+      if (!this.$store.state.profile) return;
+
+      this.ratingLoading = true;
+
+      socket.emit('getTrueSkillRating', this.$store.state.profile.id, (response) => {
+        this.ratingLoading = false;
+
+        if (response.success && response.rating) {
+          this.trueSkillRating = response.rating;
+
+          this.resetCooldownMonths = response.resetCooldownMonths ?? 3;
+          this.nextResetDate = response.nextResetAvailableAt ? new Date(response.nextResetAvailableAt) : null;
+        }
+      });
+    },
+  },
+  beforeRouteEnter(_to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) {
+    if (!store.state.profile) {
+      next(localizedPath('/', i18n.global.locale.value));
+      eventBus.emit('openAuthModal');
+    } else {
+      next();
+    }
+  },
+});
+</script>
+
+<style scoped lang="scss">
+.profile-page-wrapper {
+  padding: 82px 24px 48px;
+  min-height: 100vh;
+}
+
+.profile-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.profile-card {
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: rgb(var(--v-theme-inset));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  box-shadow: none;
+  min-width: 0;
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 18px 24px;
+    white-space: normal;
+
+    .material-icons {
+      font-size: 24px;
+      opacity: 0.8;
+    }
+  }
+
+  :deep(.v-card-text) {
+    padding: 24px;
+  }
+}
+
+// Шапка профиля
+.profile-header {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 0;
+  align-items: flex-start;
+}
+
+.avatar {
+  display: block;
+  height: 104px;
+  width: 104px;
+  border-radius: 16px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.profile-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.profile-name {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.profile-login {
+  color: rgba(var(--v-theme-on-surface), 0.65);
+  overflow-wrap: anywhere;
+}
+.profile-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+}
+.profile-rating {
+  padding-left: 24px;
+  border-left: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+.profile-avatar {
+  width: 104px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.profile-summary .profile-info {
+  flex: 1;
+}
+.profile-actions .logout-btn {
+  align-self: flex-end;
+  flex: 0 0 auto;
+}
+
+// Кнопки действий
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .action-btn {
+    flex: 1;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none;
+    min-height: 48px;
+  }
+}
+
+// Кнопка изменения пароля
+.password-btn {
+  border-width: 2px;
+  font-weight: 500;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-primary), 0.08);
+  }
+}
+
+// Настройки
+.image-style-fieldset {
+  container-type: inline-size;
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
+  min-width: 0;
+
+  legend {
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
+.image-style-hint,
+.image-style-note,
+.image-style-description {
+  color: rgba(var(--v-theme-on-surface), 0.8);
+  line-height: 1.6;
+}
+
+.image-style-hint {
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+
+.image-style-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.image-style-option {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-width: 0;
+  border: 2px solid rgba(var(--v-theme-on-surface), 0.16);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgb(var(--v-theme-inset));
+  color: rgb(var(--v-theme-on-surface));
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: rgb(var(--v-theme-inset-hover));
+  }
+
+  &[aria-pressed='true'] {
+    border-color: rgb(var(--v-theme-primary));
+    background: rgba(var(--v-theme-primary), 0.08);
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgb(var(--v-theme-primary));
+    outline-offset: 3px;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    object-position: center 20%;
+  }
+}
+
+.image-style-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 8px;
+  overflow-wrap: anywhere;
+}
+
+.image-style-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.image-style-description,
+.image-style-note {
+  font-size: 12px;
+}
+
+.image-style-note {
+  margin: 12px 0 0;
+}
+
+.image-style-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: 18px;
+}
+
+@container (max-width: 360px) {
+  .image-style-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .image-style-option {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .image-style-copy {
+    padding: 12px 16px;
+  }
+
+  .image-style-check {
+    left: 8px;
+    right: auto;
+  }
+}
+
+.settings-divider {
+  height: 1px;
+  background: rgba(var(--v-theme-on-surface), 0.1);
+  margin: 20px 0;
+}
+
+.settings-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-bottom: 12px;
+}
+
+// Опасная зона
+.danger-zone {
+  border: 1px solid rgba(var(--v-theme-error), 0.3);
+
+  .danger-header {
+    background: rgba(var(--v-theme-error), 0.1);
+    color: rgb(var(--v-theme-error));
+
+    .material-icons {
+      color: rgb(var(--v-theme-error));
+    }
+  }
+}
+
+.danger-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.danger-info {
+  flex: 1;
+}
+
+.danger-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.danger-description {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.danger-cooldown {
+  font-size: 12px;
+  color: rgb(var(--v-theme-error));
+  margin-top: 4px;
+}
+
+// Адаптивность
+@media (max-width: 600px) {
+  .profile-page-wrapper {
+    padding: 72px 16px 32px;
+  }
+
+  .profile-card {
+    :deep(.v-card-text) {
+      padding: 16px;
+    }
+  }
+
+  .profile-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 0;
+  }
+
+  .avatar {
+    height: 80px;
+    width: 80px;
+    border-radius: 12px;
+  }
+
+  .profile-info {
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .profile-name {
+    font-size: 20px;
+    justify-content: flex-start;
+  }
+
+  .profile-email {
+    font-size: 13px;
+    justify-content: flex-start;
+  }
+
+  .profile-name-row {
+    gap: 12px;
+    flex-direction: column;
+  }
+  .profile-rating {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .profile-avatar {
+    width: 80px;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .action-btn {
+    min-height: 44px;
+  }
+
+  .danger-item {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+
+    .v-btn {
+      width: 100%;
+    }
+  }
+}
+
+// Диалоги подтверждения
+.reset-rating-dialog,
+.logout-dialog {
+  border-radius: 16px !important;
+  background-color: rgb(var(--v-theme-inset)) !important;
+  overflow: hidden;
+
+  .dialog-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px 12px;
+    font-size: 18px;
+    font-weight: 600;
+    white-space: normal;
+
+    .warning-icon {
+      color: rgb(var(--v-theme-warning));
+      font-size: 28px;
+    }
+  }
+
+  .dialog-text {
+    padding: 0 24px 16px;
+    font-size: 15px;
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+
+  .dialog-actions {
+    padding: 12px 24px 20px;
+    gap: 12px;
+
+    .dialog-btn {
+      flex: 1;
+      min-height: 44px;
+    }
+  }
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.profile-summary :deep(.v-card-text) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 184px);
+  gap: 24px;
+  align-items: center;
+}
+.avatar-button {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.avatar-button:hover .avatar {
+  border-color: rgb(var(--v-theme-primary));
+}
+.avatar-edit {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  border: 3px solid rgb(var(--v-theme-inset));
+}
+.avatar-edit .material-icons {
+  font-size: 18px;
+}
+.avatar-link {
+  min-height: 44px;
+  margin-top: 8px;
+  text-align: center;
+  color: rgb(var(--v-theme-primary));
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+  cursor: pointer;
+}
+.avatar-link:hover {
+  text-decoration: underline;
+}
+.avatar-button:focus-visible,
+.avatar-link:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 4px;
+}
+.name-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.name-field {
+  min-width: 0;
+}
+.save-name {
+  min-height: 48px;
+}
+.credential-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+}
+.credential-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.field-label,
+.section-hint {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 13px;
+}
+.section-hint {
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.password-btn {
+  margin-top: 12px;
+  min-height: 44px;
+}
+.profile-page :deep(.v-btn) {
+  text-transform: none;
+  letter-spacing: 0;
+  min-height: 44px;
+}
+.profile-page :deep(.v-btn__content) {
+  white-space: normal;
+}
+.profile-page :deep(.v-selection-control__input) {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .profile-page {
+    gap: 20px;
+  }
+  .profile-summary :deep(.v-card-text) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .profile-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-actions .logout-btn {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+@media (max-width: 400px) {
+  .profile-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .name-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .profile-header {
+    align-items: flex-start;
+  }
+  .profile-name {
+    font-size: 22px;
+  }
+}
+</style>

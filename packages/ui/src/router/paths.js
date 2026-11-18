@@ -1,0 +1,32 @@
+// Shared by the client router, prerenderer and sitemap generator.
+const localePrefix = /^\/(en|ru|zh-tw|zh-cn|es|pt|vi)(?=\/|$)/i;
+
+function basePath(path) {
+  const withoutLocale = path.replace(localePrefix, '') || '/';
+  return withoutLocale.endsWith('/') ? withoutLocale : `${withoutLocale}/`;
+}
+
+function localizedPath(path, language) {
+  const prefix = language.toLowerCase() === 'en' ? '' : `/${language.toLowerCase()}`;
+  return prefix + basePath(path);
+}
+
+function languageSwitchTarget(path, language, availableLocales, hash = '') {
+  const available =
+    !availableLocales || availableLocales.some((locale) => locale.toLowerCase() === language.toLowerCase());
+  return { path: localizedPath(available ? path : '/', language), hash: available ? hash : '' };
+}
+
+function isNeutralPath(path) {
+  return /^\/(?:admin\/bots|password-recovery|profile|leaderboard|achievements\/global|room\/[^/]+|stats\/user\/[^/]+|achievements\/user\/[^/]+)\/$/.test(
+    basePath(path),
+  );
+}
+
+function neutralRoomUrl(url) {
+  const result = new URL(url);
+  result.pathname = basePath(result.pathname);
+  return result.href;
+}
+
+module.exports = { basePath, localizedPath, languageSwitchTarget, isNeutralPath, neutralRoomUrl };

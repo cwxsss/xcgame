@@ -1,0 +1,282 @@
+import type { VoiceState, VoiceJoin, VoiceError } from '../voice';
+import type { PlayerGameSummary } from '../stats/player-games';
+import type { StickerResponse, StickerMessage, StickerError } from '../user/stickers';
+import type { AiBotDifficulty, AiBotMode, AiLanguage, AiPlayerCount, TRoomState, RoomBot } from '../room';
+import type { VisualGameState } from '../game/state';
+import type { GameOptions, GameOptionsCustomRules } from '../game/options';
+import type { PlayMode } from '../game/play-mode';
+
+import type { Server as SuperServer, Socket as SuperServerSocket } from 'socket.io';
+import type { Socket as SuperSocket } from 'socket.io-client';
+import type { TVoteOption } from '../game/vote';
+import type { TMissionResult } from '../game/mission';
+import type { TLoyalty, TRoles } from '../game/roles';
+import type { TrueSkillSocketEvents } from './trueskill-sockets';
+
+import type {
+  ISocketError,
+  IRoomUnavailableError,
+  ILoginError,
+  IRegisterError,
+  IUpdateEmailError,
+  IUpdatePasswordError,
+  IUpdateLoginError,
+  IUpdateAvatarError,
+} from './errors';
+import type { TAssassinateType } from '../game/addons';
+
+import type { TRoomsList, TMessage, ChatSendResult } from '../room';
+import { TTotalWinrateStats, RoleRating, Achievement, UserAchievement, AchievementStats } from '../stats';
+import { UserForUI, UserProfile, IAvatarInfo, PublicUserProfile, UserWithToken } from '../user';
+
+export interface AchievementResponse {
+  success: boolean;
+  achievements?: Achievement[];
+  userAchievements?: UserAchievement[];
+  stats?: AchievementStats[];
+  error?: string;
+}
+
+export type {
+  ISocketError,
+  ILoginError,
+  IRegisterError,
+  IUpdateEmailError,
+  IUpdatePasswordError,
+  IUpdateLoginError,
+  IUpdateAvatarError,
+} from './errors';
+export type { ArgumentOfCallback } from './helpers';
+
+export interface ServerToClientEvents {
+  voiceStateChanged: (roomID: string) => void;
+  voiceRevoked: (sessionID: string) => void;
+  stickerSent: (message: StickerMessage) => void;
+  stickersUpdated: () => void;
+  publicProfileChanged: (id: string, fields: Partial<Pick<PublicUserProfile, 'name' | 'avatar'>>) => void;
+  roomsListUpdated: (list: TRoomsList) => void;
+  onlineCounterUpdated: (counter: number) => void;
+  roomOnlineUpdated: (counter: number) => void;
+  roomUpdated: (state: TRoomState, chatOnly?: boolean) => void;
+  gameUpdated: (state: VisualGameState) => void;
+  newMessage: (message: TMessage) => void;
+  restartGame: (uuid: string) => void;
+  destroyRoom: (uuid: string) => void;
+  serverError: (error: string) => void;
+  renewJWT: () => void;
+  achievementUnlocked: (achievementId: string) => void;
+  achievementProgress: (data: { achievementID: string; currentProgress: number; requirement: number }) => void;
+  hiddenAchievementsList: (achievements: string[]) => void;
+}
+
+export interface ClientToServerUserEvents {
+  getVoiceState: (roomID: string, cb: (result: VoiceState | VoiceError) => void) => void;
+  joinVoice: (roomID: string, cb: (result: VoiceJoin | VoiceError) => void) => void;
+  leaveVoice: (sessionID: string, cb: (result: true | VoiceError) => void) => void;
+  getMyStickers: (cb: (result: StickerResponse) => void) => void;
+  updateStickerPreferences: (favorites: string[], hideOnBoard: boolean, cb: (result: StickerResponse) => void) => void;
+  sendSticker: (roomID: string, stickerID: string, cb: (result: true | StickerError) => void) => void;
+  createGuest: (name: string, callback: (user: UserWithToken | ISocketError) => void) => void;
+  registerUser: (
+    user: Omit<UserProfile, 'avatar' | 'registrationDate'>,
+    callback: (user: UserWithToken | IRegisterError) => void,
+  ) => void;
+  updateUserName: (name: string, callback?: (result: true | ISocketError) => void) => void;
+  updateUserEmail: (password: string, email: string, callback: (result: true | IUpdateEmailError) => void) => void;
+  updateUserLogin: (password: string, login: string, callback: (result: true | IUpdateLoginError) => void) => void;
+  updateUserPassword: (
+    password: string,
+    newPassword: string,
+    callback: (result: true | IUpdatePasswordError) => void,
+  ) => void;
+  updateUserAvatar: (avatarID: string, callback: (result: true | IUpdateAvatarError) => void) => void;
+  login: (loginOrEmail: string, password: string, callback: (user: UserWithToken | ILoginError) => void) => void;
+  getUserAvatars: (callback: (avatars: IAvatarInfo[] | ISocketError) => void) => void;
+  getMyProfile: (callback: (user: UserForUI | ISocketError) => void) => void;
+  revealEasterEgg: () => void;
+}
+
+export interface ClientToServerEvents extends ClientToServerUserEvents, TrueSkillSocketEvents {
+  getTotalStats: (callback: (stats: TTotalWinrateStats | ISocketError) => void) => void;
+  getPlayerGameSummaries: (uuid: string, callback: (games: PlayerGameSummary[] | null | ISocketError) => void) => void;
+  getPlayerGameSummariesPage: (
+    uuid: string,
+    cursor: string | null,
+    callback: (page: import('../stats/player-games').PlayerGameSummaryPage | ISocketError) => void,
+  ) => void;
+  getPlayerGames: (uuid: string, callback: (games: VisualGameState[] | ISocketError) => void) => void;
+  getAiRoomsList: (callback: (result: { rooms: TRoomsList } | { error: string }) => void) => void;
+  getRoomsList: (callback: (list: TRoomsList | ISocketError) => void) => void;
+  getOnlineCounter: (id: string, callback: (counter: number | ISocketError) => void) => void;
+  getUserProfile: (id: string, callback: (user: PublicUserProfile | ISocketError) => void) => void;
+
+  // Rating system endpoints
+  getRolesWithRatings: (callback: (roles: TRoles[] | { error: string }) => void) => void;
+  getRoleLeaderboard: (role: TRoles, callback: (leaderboard: RoleRating[] | { error: string }) => void) => void;
+  getUserRatings: (userID: string, callback: (ratings: RoleRating[] | { error: string }) => void) => void;
+  getPopularRoles: (
+    minPlayers: number,
+    callback: (roles: { role: TRoles; playerCount: number }[] | { error: string }) => void,
+  ) => void;
+  getTopPlayersForPopularRoles: (
+    minPlayers: number,
+    callback: (result: { role: TRoles; topPlayer: RoleRating | null }[] | { error: string }) => void,
+  ) => void;
+  getRatingHistory: (
+    userID: string,
+    role: TRoles,
+    callback: (history: { date: Date; rating: number | null; rank: number | null }[] | { error: string }) => void,
+  ) => void;
+
+  // Achievement system endpoints
+  getAllAchievements: (callback: (response: AchievementResponse) => void) => void;
+  getUserAchievements: (userID: string, callback: (response: AchievementResponse) => void) => void;
+  getAchievementStats: (callback: (response: AchievementResponse) => void) => void;
+
+  getAiSpectatorRoles: (
+    roomID: string,
+    callback: (
+      result: { roles: Record<string, TRoles>; decisions: import('../room').AiSpectatorDecision[] } | { error: string },
+    ) => void,
+  ) => void;
+  getBeginnerReview: (roomID: string, callback: (result: import('../room').BeginnerReviewResponse) => void) => void;
+  getAiRoomAccess: (
+    callback: (result: {
+      canManage: boolean;
+      canPlay?: boolean;
+      botsBusy?: boolean;
+      botModes?: Record<AiBotMode, boolean>;
+      canPlayLargeTables?: boolean;
+      /** Estimated quota recovery, in Unix milliseconds; omitted when unknown or occupied. */
+      botModeAvailableAt?: Partial<Record<AiBotMode, number>>;
+      ownRoomID?: string;
+      roomID?: string;
+      models?: { id: string; label: string }[];
+      defaultModel?: string;
+    }) => void,
+  ) => void;
+  getAiCodexWeeklyLimit: (
+    callback: (result: { weekly: import('../room').CodexWeeklyLimit | null } | { error: string }) => void,
+  ) => void;
+  getAiBotDashboard: (callback: (result: import('../room').AiBotDashboard | { error: string }) => void) => void;
+  consumeAiBotReset: (
+    request: import('../room').ConsumeAiBotResetRequest,
+    callback: (result: { outcome: import('../room').CodexResetOutcome } | { error: string }) => void,
+  ) => void;
+  setAiBotQuotaThresholds: (
+    thresholds: import('../room').BotQuotaThresholds,
+    callback: (result: { ok: true } | { error: string }) => void,
+  ) => void;
+  getAiCodexModels: (
+    callback: (result: { models: import('../room').CodexModelOption[] } | { error: string }) => void,
+  ) => void;
+  configureAiCodex: (
+    roomID: string,
+    settings: import('../room').CodexSettings,
+    callback: (result: { ok: true } | { error: string }) => void,
+  ) => void;
+  createAiRoom: (
+    options: string | { model: string; language: AiLanguage; playerCount?: AiPlayerCount },
+    callback: (result: { roomID: string } | { error: string }) => void,
+  ) => void;
+  restartHumanAiRoom: (roomID: string, callback: (result: { roomID: string } | { error: string }) => void) => void;
+  createHumanAiRoom: {
+    (callback: (result: { roomID: string } | { error: string }) => void): void;
+    (
+      options: {
+        beginner: boolean;
+        role?: import('../room/ai-roles').AiHumanRole;
+        withFriend?: boolean;
+        humanSeats?: number;
+        difficulty?: AiBotDifficulty;
+        language?: AiLanguage;
+        playerCount?: AiPlayerCount;
+        playMode?: PlayMode;
+      },
+      callback: (result: { roomID: string } | { error: string }) => void,
+    ): void;
+  };
+  getLobbyAiAccess: (
+    roomID: string,
+    callback: (
+      result: { available: boolean; hostPremium: boolean; humanPlayerIDs: string[] } | { error: string },
+    ) => void,
+  ) => void;
+  startLobbyAiRoom: (
+    roomID: string,
+    options: { playerCount: AiPlayerCount; language: AiLanguage; humanPlayerIDs: string[]; playMode?: PlayMode },
+    callback: (result: { ok: true } | { error: string }) => void,
+  ) => void;
+  startHumanAiRoom: (
+    roomID: string,
+    options: { difficulty: AiBotDifficulty; language: AiLanguage; playerCount?: AiPlayerCount; playMode?: PlayMode },
+    callback: (result: { ok: true } | { error: string }) => void,
+  ) => void;
+  controlAiRoom: (
+    roomID: string,
+    action: 'start' | 'stop' | 'resumeTechnical',
+    callback: (result: { ok: true } | { error: string }) => void,
+  ) => void;
+  finishAiDiscussion: (roomID: string, callback: (result: { ok: true } | { error: string }) => void) => void;
+  joinAiRoom: (roomID: string, callback: (result: { ok: true } | { error: string }) => void) => void;
+  createRoom: (callback: (result: string | ISocketError) => void) => void;
+  updateOptions: (uuid: string, options: GameOptions) => void;
+  setRoomBots: (uuid: string, bots: Array<Pick<RoomBot, 'role'>>, callback: (result: true | { error: string }) => void) => void;
+  joinRoom: (uuid: string, callback: (state: TRoomState | IRoomUnavailableError) => void) => void;
+  sendMessage: (uuid: string, message: string, requestID: string, callback: (result: ChatSendResult) => void) => void;
+  lockRoom: (uuid: string) => void;
+  kickPlayer: (uuid: string, userID: string) => void;
+  transferHost: (uuid: string, userID: string) => void;
+  leaveRoom: (uuid: string) => void;
+
+  endGame: (uuid: string) => void;
+  endAndRestartGame: (uuid: string) => void;
+  shuffle: (uuid: string) => void;
+  voteInRoom: (uuid: string, result: boolean) => void;
+
+  joinGame: (uuid: string) => void;
+  startGame: (uuid: string, customRules?: GameOptionsCustomRules) => void;
+  leaveGame: (uuid: string) => void;
+  restartGame: (uuid: string) => void;
+
+  selectPlayer: (uuid: string, userID: string) => void;
+  sentSelectedPlayers: (uuid: string) => void;
+  voteForMission: (uuid: string, option: TVoteOption) => void;
+  actionOnMission: (uuid: string, result: TMissionResult) => void;
+  assassinate: (uuid: string, type: TAssassinateType, role?: TRoles) => void;
+
+  checkLoyalty: (uuid: string, cardID?: string) => void;
+  checkLoyaltyWithCard: (uuid: string, cardID: string) => void;
+  revealLoyalty: (uuid: string, cardID?: string) => void;
+  revealLoyaltyWithCard: (uuid: string, cardID: string) => void;
+  getLoyalty: (uuid: string, callback: (loyalty: TLoyalty | TRoles) => void) => void;
+  getLoyaltyWithCard: (uuid: string, cardID: string, callback: (loyalty: TLoyalty | TRoles) => void) => void;
+  announceLoyalty: (uuid: string, loyalty: TLoyalty | TRoles) => void;
+  announceLoyaltyWithCard: (uuid: string, loyalty: TLoyalty | TRoles, cardID: string) => void;
+
+  giveExcalibur: (uuid: string) => void;
+  useExcalibur: (uuid: string) => void;
+  discardMissionCard: (uuid: string) => void;
+
+  useWitchAbility: (uuid: string, result: boolean) => void;
+
+  givePlotCard: (uuid: string) => void;
+  preVote: (uuid: string, option: TVoteOption, cardID: string) => void;
+  useLeadToVictory: (uuid: string, use: boolean, cardID: string) => void;
+  useAmbush: (uuid: string, cardID: string) => void;
+  useRestoreHonor: (uuid: string, restoreHonorCardID: string, cardID: string) => void;
+  useKingReturns: (uuid: string, use: boolean, cardID: string) => void;
+  useWeFoundYou: (uuid: string, use: boolean, cardID: string) => void;
+
+  // Custom timer events
+  startCustomTimer: (uuid: string, durationSeconds?: number) => void;
+  addCustomTimerTime: (uuid: string, additionalSeconds: number) => void;
+  stopCustomTimer: (uuid: string) => void;
+  setCustomTimerPlayer: (uuid: string, playerID: string | null) => void;
+  nextCustomTimerPlayer: (uuid: string) => void;
+  setCustomTimerDuration: (uuid: string, durationSeconds: number) => void;
+}
+
+export type Server = SuperServer<ClientToServerEvents, ServerToClientEvents>;
+export type Socket = SuperSocket<ServerToClientEvents, ClientToServerEvents>;
+export type ServerSocket = SuperServerSocket<ClientToServerEvents, ServerToClientEvents>;

@@ -1,0 +1,648 @@
+<template>
+  <section v-if="ai" class="ai-panel" :class="{ 'ai-panel--beginner': ai.beginner }" :aria-label="$t('aiArena.title')">
+    <div
+      v-if="
+        isHumanPlayer && (!ai.withFriend || isDiscussionPlayer) && ai.status === 'running' && ai.waitingForDiscussion
+      "
+      class="ai-human-turn"
+      role="status"
+    >
+      <strong>{{ $t('aiArena.yourDiscussionTurn') }}</strong>
+      <p v-if="!ai.beginner">{{ $t('aiArena.discussionHint') }}</p>
+      <v-btn color="primary" :loading="busy" :disabled="busy" @click="finishDiscussion">
+        {{ $t('aiArena.passTurn') }}
+      </v-btn>
+    </div>
+    <details class="ai-disclosure">
+      <summary
+        ref="controlsTrigger"
+        :aria-haspopup="mobile ? 'dialog' : undefined"
+        :aria-expanded="mobile ? controlsOpen : undefined"
+        @click="openControls"
+      >
+        <span class="ai-heading"
+          ><strong>{{ ai.title || $t('aiArena.title') }}</strong
+          ><small>{{ rosterText }}</small
+          ><small v-if="displayModel">{{ displayModel }}</small></span
+        >
+        <span class="ai-separator" aria-hidden="true">·</span>
+        <span class="ai-status" :class="`ai-status--${ai.status}`">{{ $t(`aiArena.${ai.status}`) }}</span>
+        <span class="ai-expand" aria-hidden="true">⌄</span>
+        <span class="sr-only">{{ $t('aiArena.controls') }}</span>
+      </summary>
+      <component
+        :is="mobile ? VDialog : 'div'"
+        v-bind="
+          mobile
+            ? {
+                modelValue: controlsOpen,
+                persistent: busy,
+                class: 'ai-controls-dialog',
+                'aria-label': $t('aiArena.controls'),
+              }
+            : {}
+        "
+        @update:modelValue="controlsOpen = $event"
+        @afterLeave="controlsTrigger?.focus({ preventScroll: true })"
+      >
+        <div class="ai-details" :class="{ 'ai-sheet': mobile }">
+          <header v-if="mobile" class="ai-sheet-header">
+            <h2>{{ ai.title || $t('aiArena.title') }}</h2>
+            <button type="button" :aria-label="$t('infoMessage.close')" :disabled="busy" @click="controlsOpen = false">
+              <v-icon icon="close" aria-hidden="true" />
+            </button>
+          </header>
+          <p v-if="mobile">{{ rosterText }}</p>
+          <p v-if="mobile && displayModel">{{ displayModel }}</p>
+          <p>{{ $t('aiArena.language', { language: displayLanguage }) }}</p>
+          <p aria-live="polite">
+            {{
+              ai.message?.startsWith('Codex subscription usage limit reached.')
+                ? $t('aiArena.codexLimitReached')
+                : ai.message
+            }}
+          </p>
+          <p v-if="!ai.publicBotGame && !ai.botDifficulty && ai.model === 'codex-chatgpt'">
+            {{ $t('aiArena.codexSubscription') }}
+          </p>
+          <v-btn
+            v-if="canManage && ai.model === 'codex-chatgpt'"
+            :to="{ name: 'adminBots' }"
+            class="ai-admin-link"
+            color="primary"
+            variant="outlined"
+          >
+            <v-icon icon="analytics" start aria-hidden="true" />{{ $t('aiArena.botDashboard') }}
+          </v-btn>
+          <div
+            v-if="
+              canManage &&
+              !ai.publicBotGame &&
+              !ai.botDifficulty &&
+              ai.model === 'codex-chatgpt' &&
+              ai.status === 'ready'
+            "
+            class="codex-settings"
+          >
+            <label>
+              <span>{{ $t('aiArena.codexModel') }}</span>
+              <select v-model="codexModel" :disabled="busy || !codexModels.length">
+                <option v-for="model in pricedCodexModels" :key="model.id" :value="model.id">{{ model.label }}</option>
+              </select>
+            </label>
+            <p v-if="codexModels.length" class="codex-price-hint">
+              <a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noopener noreferrer">{{
+                $t('aiArena.codexRelativePrice')
+              }}</a>
+            </p>
+            <label>
+              <span>{{ $t('aiArena.codexReasoning') }}</span>
+              <select v-model="codexReasoning" :disabled="busy || !efforts.length">
+                <option v-for="effort in efforts" :key="effort" :value="effort">{{ effort }}</option>
+              </select>
+            </label>
+            <p v-if="!codexModels.length" role="status">{{ $t('aiArena.codexModelsUnavailable') }}</p>
+          </div>
+          <p v-if="!ai.publicBotGame && !ai.botDifficulty && ai.codex && ai.status !== 'ready'">
+            {{ ai.codex.model }} · {{ ai.codex.reasoning }}
+          </p>
+          <v-btn
+            v-if="canReveal"
+            class="mt-2"
+            :color="mobile ? 'primary' : undefined"
+            :variant="mobile ? 'outlined' : undefined"
+            :loading="revealing"
+            :aria-pressed="rolesShown"
+            @click="toggleRoles"
+          >
+            {{ $t(rolesShown ? 'aiArena.hideRoles' : 'aiArena.revealRoles') }}
+          </v-btn>
+          <p v-if="rolesShown">{{ $t('aiArena.rolesHint') }}</p>
+          <p v-if="rolesShown">{{ $t('aiArena.privateDecisionsHint') }}</p>
+          <p v-if="rolesShown && decisionsError" role="status">{{ $t('aiArena.connectionError') }}</p>
+          <div v-if="canControl" class="ai-controls">
+            <v-btn
+              v-if="canJoin && ai.status === 'ready' && !ai.humanPlayerID"
+              color="primary"
+              :loading="busy"
+              :disabled="busy"
+              @click="join"
+              >{{ $t('aiArena.playWithBots') }}</v-btn
+            >
+            <v-btn
+              v-if="ai.status === 'ready' && !ai.publicBotGame"
+              color="success"
+              :loading="busy"
+              :disabled="busy || (!ai.botDifficulty && ai.model === 'codex-chatgpt' && !efforts.length)"
+              @click="control('start')"
+              >{{ $t('aiArena.start') }}</v-btn
+            >
+            <v-btn
+              v-if="ai.status === 'paused' && ai.canResumeTechnical"
+              color="success"
+              :loading="busy"
+              @click="control('resumeTechnical')"
+            >
+              {{ $t('aiArena.resumeTechnical') }}
+            </v-btn>
+            <v-btn
+              v-if="['ready', 'running', 'paused'].includes(ai.status) && !confirmStop"
+              :color="mobile ? 'text-secondary' : 'warning'"
+              :variant="mobile ? 'text' : 'elevated'"
+              :class="{ 'ai-stop': mobile }"
+              :disabled="busy"
+              data-ai-stop
+              @click="requestStop"
+              >{{ $t(mobile ? 'aiArena.endMatch' : 'aiArena.stop') }}</v-btn
+            >
+            <div v-if="confirmStop" class="ai-stop-confirmation" role="alert">
+              <p>{{ $t('aiArena.endMatchConfirm') }}</p>
+              <div>
+                <v-btn color="primary" variant="outlined" :disabled="busy" @click="confirmStop = false">{{
+                  $t('modal.cancel')
+                }}</v-btn>
+                <v-btn
+                  color="error"
+                  variant="text"
+                  :loading="busy"
+                  :disabled="busy"
+                  data-ai-confirm-stop
+                  @click="control('stop')"
+                >
+                  {{ $t('aiArena.endMatch') }}
+                </v-btn>
+              </div>
+            </div>
+          </div>
+          <p v-if="mobile && error" class="ai-error" role="alert">{{ error }}</p>
+        </div>
+      </component>
+    </details>
+    <p v-if="error && (!mobile || !controlsOpen)" class="ai-error" role="alert">{{ error }}</p>
+  </section>
+</template>
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
+import { VDialog } from 'vuetify/components';
+import { codexRelativePrice } from '@/helpers/codex-pricing';
+import { useAiAccess } from '@/helpers/composables/useAiAccess';
+import { useI18n } from 'vue-i18n';
+import { socket } from '@/api/socket';
+import { aiPlayedModel } from '@avalon/types/room/ai-model';
+import type { AiRoomState, AiSpectatorDecision, TRoles } from '@avalon/types';
+const props = defineProps<{
+  ai: AiRoomState;
+  roomID: string;
+  playerCount?: number;
+  canReveal?: boolean;
+  canJoin?: boolean;
+  isHumanPlayer?: boolean;
+  isDiscussionPlayer?: boolean;
+  rolesShown?: boolean;
+}>();
+const { t } = useI18n();
+const mobile = useMediaQuery('(max-width: 600px)');
+const controlsTrigger = ref<HTMLElement>();
+const controlsOpen = ref(false);
+const confirmStop = ref(false);
+function openControls(event: MouseEvent) {
+  if (!mobile.value) return;
+  event.preventDefault();
+  controlsOpen.value = true;
+}
+function requestStop() {
+  if (mobile.value) confirmStop.value = true;
+  else void control('stop');
+}
+watch([controlsOpen, () => props.roomID, () => props.ai.status], () => {
+  confirmStop.value = false;
+});
+watch(mobile, () => {
+  controlsOpen.value = false;
+});
+const { canManage, codexModels, refresh } = useAiAccess();
+const canControl = computed(
+  () => canManage.value || (Boolean(props.ai.publicBotGame || props.ai.botDifficulty) && props.isHumanPlayer === true),
+);
+const rosterText = computed(() => {
+  const humans = props.ai.humanPlayerIDs?.length ?? (props.ai.humanPlayerID ? 1 : 0);
+  const bots = displayPlayerCount.value - humans;
+  return humans ? t('aiArena.cardHumanRoster', { humans, bots }) : t('aiArena.playerCount', { count: bots });
+});
+const displayPlayerCount = computed(() => props.ai.playerCount ?? props.playerCount ?? 7);
+const displayLanguage = computed(
+  () =>
+    ({
+      en: 'English',
+      ru: 'Русский',
+      'zh-tw': '繁體中文（台灣）',
+      es: 'Español',
+      vi: 'Tiếng Việt',
+      pt: 'Português',
+      'zh-cn': '简体中文',
+    })[props.ai.language || 'en'],
+);
+const pricedCodexModels = computed(() => {
+  const ids = codexModels.value.map((model) => model.id);
+  return codexModels.value.map((model) => ({
+    ...model,
+    label: `${model.label} · ${codexRelativePrice(model.id, ids) || t('aiArena.codexPriceUnavailable')}`,
+  }));
+});
+const codexModel = ref(props.ai.codex?.model || '');
+const displayModel = computed(() =>
+  props.ai.model === 'codex-chatgpt' ? aiPlayedModel(props.ai) || codexModel.value : aiPlayedModel(props.ai),
+);
+const codexReasoning = ref(props.ai.codex?.reasoning || 'low');
+const efforts = computed(() => codexModels.value.find((model) => model.id === codexModel.value)?.efforts || []);
+watch(
+  [() => props.roomID, () => props.ai.codex?.model, () => props.ai.codex?.reasoning],
+  () => {
+    if (props.ai.codex) {
+      codexModel.value = props.ai.codex.model;
+      codexReasoning.value = props.ai.codex.reasoning;
+    } else {
+      codexModel.value = codexModels.value[0]?.id || '';
+      codexReasoning.value = 'low';
+    }
+  },
+  { immediate: true },
+);
+watch(
+  codexModels,
+  (models) => {
+    if (!models.length) return;
+    if (!models.some((model) => model.id === codexModel.value)) codexModel.value = models[0]?.id || '';
+  },
+  { immediate: true },
+);
+watch(
+  efforts,
+  (levels) => {
+    if (!levels.length) return;
+    if (!levels.includes(codexReasoning.value)) codexReasoning.value = levels.includes('low') ? 'low' : levels[0] || '';
+  },
+  { immediate: true },
+);
+const emit = defineEmits<{ roles: [value: Record<string, TRoles>]; decisions: [value: AiSpectatorDecision[]] }>();
+const revealing = ref(false);
+
+const decisionsError = ref(false);
+watch(
+  [() => props.rolesShown, () => props.canReveal, () => props.roomID],
+  ([shown, allowed, roomID], _, onCleanup) => {
+    emit('decisions', []);
+    decisionsError.value = false;
+    if (!shown || !allowed) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    onCleanup(() => {
+      active = false;
+      clearTimeout(timer);
+    });
+    const refreshDecisions = async () => {
+      try {
+        const result = await socket.timeout(5000).emitWithAck('getAiSpectatorRoles', roomID);
+        if (!active) return;
+        decisionsError.value = 'error' in result;
+        if ('error' in result) emit('decisions', []);
+        else emit('decisions', result.decisions);
+      } catch {
+        if (active) decisionsError.value = true;
+      } finally {
+        if (active) timer = setTimeout(refreshDecisions, 3000);
+      }
+    };
+    void refreshDecisions();
+  },
+  { immediate: true },
+);
+
+async function toggleRoles() {
+  error.value = '';
+  if (props.rolesShown) return emit('roles', {});
+  const roomID = props.roomID;
+  revealing.value = true;
+  try {
+    const result = await socket.timeout(5000).emitWithAck('getAiSpectatorRoles', roomID);
+    if (props.roomID !== roomID || !props.canReveal) return;
+    if ('error' in result) error.value = t('aiArena.rolesError');
+    else emit('roles', result.roles);
+  } catch {
+    error.value = t('aiArena.connectionError');
+  } finally {
+    revealing.value = false;
+  }
+}
+const busy = ref(false);
+const error = ref('');
+async function finishDiscussion() {
+  busy.value = true;
+  error.value = '';
+  try {
+    const result = await socket.timeout(10000).emitWithAck('finishAiDiscussion', props.roomID);
+    if ('error' in result) error.value = t('aiArena.discussionError');
+  } catch {
+    error.value = t('aiArena.connectionError');
+  } finally {
+    busy.value = false;
+  }
+}
+async function join() {
+  busy.value = true;
+  error.value = '';
+  try {
+    const result = await socket.timeout(10000).emitWithAck('joinAiRoom', props.roomID);
+    if ('error' in result) error.value = t('aiArena.joinError');
+  } catch {
+    error.value = t('aiArena.connectionError');
+  } finally {
+    busy.value = false;
+  }
+}
+async function control(action: 'start' | 'stop' | 'resumeTechnical') {
+  busy.value = true;
+  error.value = '';
+  try {
+    if (action === 'start' && !props.ai.botDifficulty && props.ai.model === 'codex-chatgpt') {
+      const configured = await socket.timeout(30000).emitWithAck('configureAiCodex', props.roomID, {
+        model: codexModel.value,
+        reasoning: codexReasoning.value,
+      });
+      if ('error' in configured) {
+        error.value = configured.error;
+        return;
+      }
+    }
+    const result = await socket.timeout(10000).emitWithAck('controlAiRoom', props.roomID, action);
+    if ('error' in result) error.value = result.error;
+    else {
+      if (action === 'stop') controlsOpen.value = false;
+      await refresh();
+    }
+  } catch {
+    error.value = t('aiArena.connectionError');
+  } finally {
+    busy.value = false;
+  }
+}
+</script>
+<style scoped>
+.ai-human-turn {
+  padding: 12px;
+}
+.ai-human-turn p {
+  margin: 8px 0 12px;
+}
+.ai-panel--beginner .ai-human-turn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+}
+.ai-panel--beginner .ai-human-turn strong {
+  font-size: 13px;
+}
+.ai-panel--beginner .ai-human-turn :deep(.v-btn) {
+  min-height: 44px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ai-panel {
+  width: min(360px, calc(100vw - 16px));
+  border: 1px solid rgba(var(--v-theme-primary), 0.3);
+  border-radius: 12px;
+  background: rgb(var(--v-theme-inset));
+  box-shadow: 0 4px 16px #0002;
+  overflow: hidden;
+}
+summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -3px;
+}
+.ai-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+.ai-heading small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+  font-size: 12px;
+}
+.ai-status {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: rgba(var(--v-theme-primary), 0.12);
+}
+.ai-separator {
+  display: none;
+}
+.ai-status--running {
+  color: rgb(var(--v-theme-success));
+}
+.ai-status--paused {
+  color: rgb(var(--v-theme-warning));
+}
+details[open] .ai-expand {
+  transform: rotate(180deg);
+}
+.ai-details {
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 12px;
+  border-top: 1px solid #8884;
+}
+.ai-details p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.codex-settings {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.codex-settings label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.codex-settings select {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #8888;
+  border-radius: 6px;
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+  font: inherit;
+  width: 100%;
+  appearance: auto;
+}
+.codex-price-hint {
+  font-size: 12px;
+  margin: 0;
+}
+.codex-price-hint a {
+  color: inherit;
+}
+.codex-settings select:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+}
+.ai-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ai-details :deep(.v-btn) {
+  min-height: 44px;
+  max-width: 100%;
+  height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.ai-details :deep(.v-btn__content) {
+  white-space: normal;
+}
+.ai-admin-link {
+  box-sizing: border-box;
+  width: 100%;
+  margin-block: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ai-error {
+  margin: 8px 12px;
+  overflow-wrap: anywhere;
+}
+.ai-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ai-sheet-header h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.ai-sheet-header button {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+}
+.ai-sheet-header button:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+}
+.ai-sheet .ai-controls {
+  margin-top: 20px;
+}
+.ai-sheet :deep(.v-btn) {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ai-sheet :deep(.ai-stop) {
+  width: 100%;
+  justify-content: flex-start;
+  padding-inline: 0;
+  border-top: 1px solid rgb(var(--v-theme-surface-border));
+  border-radius: 0;
+}
+.ai-stop-confirmation {
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--v-theme-surface-border));
+}
+.ai-stop-confirmation > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .ai-panel {
+    width: auto;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  summary {
+    min-height: 44px;
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    padding: 0 12px;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .ai-heading {
+    display: block;
+    flex: initial;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .ai-heading small {
+    display: none;
+  }
+  .ai-status {
+    padding: 0;
+    background: none;
+    white-space: nowrap;
+  }
+  .ai-separator {
+    display: inline;
+    color: rgb(var(--v-theme-text-secondary));
+  }
+  .ai-human-turn {
+    background: rgb(var(--v-theme-inset));
+    border: 1px solid rgb(var(--v-theme-surface-border));
+    border-radius: 12px;
+  }
+  .ai-controls-dialog :deep(.v-overlay__content) {
+    bottom: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 56px);
+  }
+  .ai-sheet {
+    border: 1px solid rgb(var(--v-theme-surface-border));
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    background: rgb(var(--v-theme-inset));
+    color: rgb(var(--v-theme-text-primary));
+    max-height: calc(100dvh - 56px);
+    padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+</style>

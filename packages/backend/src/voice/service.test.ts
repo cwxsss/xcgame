@@ -1,0 +1,249 @@
+import { VoiceService, VoicePolicy } from './service';
+import { TokenVerifier, AccessToken, TrackSource } from 'livekit-server-sdk';
+
+const config = {
+  apiKey: 'test-key',
+  apiSecret: 'a'.repeat(40),
+  internalUrl: 'http://127.0.0.1:7880',
+  publicUrl: 'wss://voice.example',
+  gatewayHost: '127.0.0.1',
+  gatewayPort: 7882,
+};
+function setup() {
+  const policies = new Map<string, VoicePolicy>();
+  policies.set('alice', { present: true, seated: true, admin: false, leader: true });
+  policies.set('bob', { present: true, seated: true, admin: false, leader: false });
+  policies.set('admin', { present: true, seated: false, admin: true, leader: false });
+  policies.set('viewer', { present: true, seated: false, admin: false, leader: false });
+  const removed: string[] = [];
+  const service = new VoiceService(config, {
+    policy: async (userID) => policies.get(userID) || { present: false, seated: false, admin: false, leader: false },
+    exists: (id) => id === 'room',
+    remove: async (_room, id) => {
+      removed.push(id);
+    },
+    deleteRoom: async () => {},
+    stateChanged: () => {},
+    revoked: () => {},
+  });
+  return { service, policies, removed };
+}
+test('players can join a fresh room without leader activation', async () => {
+  const { service } = setup();
+  const joined = await service.join('bob', 'socket-b', 'room');
+  expect(await service.admit(joined.token)).toBe(joined.sessionID);
+});
+test('only seated players and site administrators receive microphone-only tokens', async () => {
+  const { service, policies } = setup();
+  await expect(service.join('viewer', 'socket-v', 'room')).rejects.toThrow('forbidden');
+  policies.set('viewer', { present: true, seated: false, admin: false, leader: true });
+  await expect(service.join('viewer', 'socket-v', 'room')).rejects.toThrow('forbidden');
+  for (const user of ['alice', 'admin']) {
+    const result = await service.join(user, `socket-${user}`, 'room');
+    const claims = await new TokenVerifier(config.apiKey, config.apiSecret).verify(result.token);
+    expect(claims.video).toMatchObject({
+      roomJoin: true,
+      canSubscribe: true,
+      canPublish: true,
+      canPublishSources: ['microphone'],
+      canPublishData: false,
+    });
+    expect(claims.video?.roomAdmin).not.toBe(true);
+    expect(await service.admit(result.token)).toBe(result.sessionID);
+  }
+});
+test('guests and different rooms cannot join', async () => {
+  const { service } = setup();
+  await expect(service.join('guest', 'g', 'room')).rejects.toThrow('forbidden');
+  await expect(service.join('alice', 's', 'other')).rejects.toThrow();
+});
+test('revocation rejects original and SDK-refreshed tokens before media removal completes', async () => {
+  const { service } = setup();
+  const joined = await service.join('alice', 's', 'room');
+  const original = await new TokenVerifier(config.apiKey, config.apiSecret).verify(joined.token);
+  const refreshed = new AccessToken(config.apiKey, config.apiSecret, { identity: joined.sessionID, ttl: '6h' });
+  refreshed.addGrant({ ...original.video!, canPublishSources: [TrackSource.MICROPHONE] });
+  service.revokeSocket('s');
+  await expect(service.admit(joined.token)).rejects.toThrow('forbidden');
+  await expect(service.admit(await refreshed.toJwt())).rejects.toThrow('forbidden');
+});
+test('losing seat or administrator role blocks admission even before reconciliation', async () => {
+  const { service, policies } = setup();
+  for (const user of ['bob', 'admin']) {
+    const joined = await service.join(user, user, 'room');
+    policies.set(user, { present: true, seated: false, admin: false, leader: false });
+    await expect(service.admit(joined.token)).rejects.toThrow('forbidden');
+  }
+});
+test('replacement and room destruction invalidate previous admission', async () => {
+  const { service } = setup();
+  const first = await service.join('alice', 's', 'room');
+  const second = await service.join('alice', 's2', 'room');
+  await expect(service.admit(first.token)).rejects.toThrow('forbidden');
+  expect(await service.admit(second.token)).toBe(second.sessionID);
+  service.destroyRoom('room');
+  await expect(service.admit(second.token)).rejects.toThrow('forbidden');
+});
+test('local leave cannot revoke another account session', async () => {
+  const { service } = setup();
+  const joined = await service.join('alice', 's', 'room');
+  expect(() => service.leave('bob', 'b', joined.sessionID)).toThrow('forbidden');
+  expect(await service.admit(joined.token)).toBe(joined.sessionID);
+});
+test('a pending join is rejected when its socket leaves before token signing finishes', async () => {
+  const { service } = setup();
+  const pending = service.join('alice', 's', 'room');
+  service.revokeSocket('s');
+  await expect(pending).rejects.toThrow('forbidden');
+});
+test('policy failures revoke existing connections and retire the admission', async () => {
+  const { service, policies } = setup();
+  const joined = await service.join('alice', 's', 'room');
+  let closed = false;
+  service.attach(joined.sessionID, () => {
+    closed = true;
+  });
+  policies.delete('alice');
+  await service.reconcile();
+  expect(closed).toBe(true);
+  await expect(service.admit(joined.token)).rejects.toThrow('forbidden');
+});
+test('join limits prevent unbounded token issuance', async () => {
+  const { service } = setup();
+  for (let i = 0; i < 12; i++) await service.join('alice', 's', 'room');
+  await expect(service.join('alice', 's', 'room')).rejects.toThrow('rateLimited');
+});
+test('tokens for another room and forged tokens cannot pass the gateway admission', async () => {
+  const { service } = setup();
+  const joined = await service.join('alice', 's', 'room');
+  const wrongRoom = new AccessToken(config.apiKey, config.apiSecret, { identity: joined.sessionID });
+  wrongRoom.addGrant({ roomJoin: true, room: 'different' });
+  await expect(service.admit(await wrongRoom.toJwt())).rejects.toThrow('forbidden');
+  await expect(service.admit(joined.token.slice(0, -12) + 'tampered')).rejects.toThrow();
+});
+test('failed participant removal quarantines the room and marks control unhealthy', async () => {
+  let fail = true;
+  const service = new VoiceService(config, {
+    exists: () => true,
+    policy: async () => ({ present: true, seated: true, admin: false, leader: true }),
+    remove: async () => {
+      throw Error('offline');
+    },
+    deleteRoom: async () => {
+      if (fail) throw Error('offline');
+    },
+    stateChanged: () => {},
+    revoked: () => {},
+  });
+  const joined = await service.join('alice', 's', 'room');
+  service.revokeSocket('s');
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(service.healthy()).toBe(false);
+  expect((await service.state('alice', 's', 'room')).available).toBe(false);
+  await expect(service.admit(joined.token)).rejects.toThrow('forbidden');
+  fail = false;
+  await service.reconcile();
+  expect(service.healthy()).toBe(true);
+  expect((await service.state('alice', 's', 'room')).available).toBe(true);
+  const rejoined = await service.join('alice', 's', 'room');
+  expect(await service.admit(rejoined.token)).toBe(rejoined.sessionID);
+});
+test('different accounts can join simultaneously without invalidating each other', async () => {
+  const { service } = setup();
+  const results = await Promise.all([service.join('alice', 'a', 'room'), service.join('bob', 'b', 'room')]);
+  for (const result of results) expect(await service.admit(result.token)).toBe(result.sessionID);
+});
+test('startup cleanup readiness blocks admissions and health until old media rooms are retired', async () => {
+  let ready = false;
+  const service = new VoiceService(config, {
+    ready: () => ready,
+    exists: () => true,
+    policy: async () => ({ present: true, seated: true, admin: false, leader: true }),
+    remove: async () => {},
+    deleteRoom: async () => {},
+    stateChanged: () => {},
+    revoked: () => {},
+  });
+  expect(service.healthy()).toBe(false);
+  expect((await service.state('alice', 's', 'room')).available).toBe(false);
+  await expect(service.join('alice', 's', 'room')).rejects.toThrow('unavailable');
+  ready = true;
+  expect(service.healthy()).toBe(true);
+  expect((await service.join('alice', 's', 'room')).sessionID).toBeTruthy();
+});
+test('recovery cancels an in-flight join even if media becomes ready before policy completes', async () => {
+  let ready = true;
+  let release!: () => void;
+  let delay = false;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const service = new VoiceService(config, {
+    ready: () => ready,
+    prepareRecovery: () => {
+      ready = false;
+    },
+    exists: () => true,
+    policy: async () => {
+      if (delay) await waiting;
+      return { present: true, seated: true, admin: false, leader: true };
+    },
+    remove: async () => {},
+    deleteRoom: async () => {},
+    stateChanged: () => {},
+    revoked: () => {},
+  });
+  delay = true;
+  const pending = service.join('alice', 's', 'room');
+  service.prepareRecovery();
+  ready = true;
+  release();
+  await expect(pending).rejects.toThrow('forbidden');
+  const joined = await service.join('alice', 's', 'room');
+  expect(await service.admit(joined.token)).toBe(joined.sessionID);
+});
+
+test('room members can see an empty conversation before joining', async () => {
+  const { service } = setup();
+  expect(await service.state('viewer', 'view-socket', 'room')).toMatchObject({ participantCount: 0 });
+  await service.join('alice', 'a', 'room');
+  expect(await service.state('viewer', 'view-socket', 'room')).toMatchObject({ participantCount: 0 });
+});
+
+test('participant counts track connected people, not validation requests or duplicate connections', async () => {
+  const { service } = setup();
+  const alice = await service.join('alice', 'a', 'room');
+  const bob = await service.join('bob', 'b', 'room');
+  const validation = service.attach(alice.sessionID, () => {});
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(0);
+  const first = service.attach(alice.sessionID, () => {}, true);
+  const reconnect = service.attach(alice.sessionID, () => {}, true);
+  const second = service.attach(bob.sessionID, () => {}, true);
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(2);
+  first();
+  first();
+  validation();
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(2);
+  reconnect();
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(1);
+  service.leave('bob', 'b', bob.sessionID);
+  second();
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(0);
+});
+
+test('replacement, seat loss, and room destruction remove connected participants from the count', async () => {
+  const { service, policies } = setup();
+  const first = await service.join('alice', 'a', 'room');
+  const detachOld = service.attach(first.sessionID, () => {}, true);
+  const replacement = await service.join('alice', 'new', 'room');
+  service.attach(replacement.sessionID, () => {}, true);
+  detachOld();
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(1);
+  policies.set('alice', { present: true, seated: false, admin: false, leader: true });
+  await service.reconcile();
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(0);
+  const bob = await service.join('bob', 'b', 'room');
+  service.attach(bob.sessionID, () => {}, true);
+  service.destroyRoom('room');
+  expect((await service.state('viewer', 'v', 'room')).participantCount).toBe(0);
+});

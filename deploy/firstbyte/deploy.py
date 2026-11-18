@@ -1,0 +1,319 @@
+#!/usr/bin/python3
+"""Restricted manual deployment entry point, installed root-owned on FirstByte."""
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+ROOT = Path('/opt/avalon/production')
+REPOS = {'backend': 'razdva12/backend-avalon', 'ui': 'razdva12/nginx-avalon'}
+TAG = r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?'
+SMOKE = """
+const {io} = require('socket.io-client');
+const socket = io('https://avalon-game.com', {transports:['websocket'], reconnection:false});
+const timer = setTimeout(() => process.exit(1), 15000);
+socket.on('connect', () => socket.emit('getRolesWithRatings', roles => {
+  clearTimeout(timer); socket.close(); process.exit(Array.isArray(roles) && roles.length > 0 ? 0 : 1);
+}));
+"""
+
+
+def parse_command(value):
+    match = re.fullmatch(r'(deploy|deploy-skip-rooms|check) (' + TAG + ')', value)
+    if not match or len(match[2]) > 128:
+        raise ValueError('Expected deploy, deploy-skip-rooms or check followed by vX.Y.Z')
+    return match[1], match[2]
+
+
+def run(args, *, timeout=180, input=None):
+    result = subprocess.run(args, input=input, text=True, capture_output=True, timeout=timeout)
+    if result.returncode:
+        # Do not dump container logs or environment files into GitHub Actions.
+        raise subprocess.CalledProcessError(result.returncode, args)
+    return result.stdout.strip()
+
+
+def compose(*args):
+    return run(['docker', 'compose', '-f', str(ROOT / 'compose.production.yaml'), *args], timeout=240)
+
+
+def replace_images(content, images):
+    for service, repository in REPOS.items():
+        image = images[service]
+        if not re.fullmatch(re.escape(repository) + r'@sha256:[0-9a-f]{64}', image):
+            raise ValueError('Unexpected image digest')
+        # Fail if the production compose layout changed; never rewrite other services.
+        pattern = r'(?m)^(  ' + service + r':\n(?:    [^\n]*\n)*?    image: )[^\n]+$'
+        content, count = re.subn(pattern, lambda m: m[1] + image, content)
+        if count != 1:
+            raise ValueError('Expected exactly one image for ' + service)
+    return content
+
+
+def write_compose(content):
+    target = ROOT / 'compose.production.yaml'
+    temporary = ROOT / 'compose.deploy.tmp'
+    temporary.write_text(content)
+    temporary.chmod(target.stat().st_mode & 0o777)
+    temporary.replace(target)
+
+
+def idle():
+    output = run(['docker', 'exec', '-i', '-w', '/app', 'avalon-production-backend-1', 'node', '-'],
+                 input=(ROOT / 'check-idle.cjs').read_text(), timeout=25)
+    try:
+        decision = json.loads(output)
+    except (ValueError, TypeError) as error:
+        raise RuntimeError('Room guard did not return a valid decision; deployment refused') from error
+    if (not isinstance(decision, dict) or type(decision.get('exitCode')) is not int
+            or decision['exitCode'] != 0 or decision.get('activeRooms') != []):
+        raise RuntimeError('Room guard did not confirm an idle server; deployment refused')
+    print('Room guard confirmed idle: ' + output, flush=True)
+
+
+def prepare_static(image):
+    """Export the audited UI without running its image or stopping the gateway."""
+    if not re.fullmatch(re.escape(REPOS['ui']) + r'@sha256:[0-9a-f]{64}', image):
+        raise ValueError('Unexpected UI digest')
+    ui = compose('ps', '--status', 'running', '-q', 'ui')
+    if not re.fullmatch(r'[0-9a-f]{12,64}', ui):
+        raise RuntimeError('Exactly one running UI gateway is required')
+    release = '.avalon-releases/' + image.split(':')[-1]
+    # Upgrade the startup wrapper too: a Docker/server restart must keep the
+    # selected static release. Mounted host config and TLS files are untouched.
+    run(['docker', 'cp', str(ROOT / 'nginx-entrypoint.sh'), ui + ':/usr/local/bin/avalon-nginx-entrypoint'])
+    run(['docker', 'exec', ui, 'chmod', '+x', '/usr/local/bin/avalon-nginx-entrypoint'])
+    run(['docker', 'exec', ui, '/usr/local/bin/avalon-nginx-entrypoint', 'nginx', '-s', 'reload'])
+    previous = run(['docker', 'exec', ui, 'readlink', '/app/.avalon-current'])
+    if previous != '.' and not re.fullmatch(r'\.avalon-releases/[0-9a-f]{64}', previous):
+        raise RuntimeError('Unexpected current static release')
+    if previous == release:
+        return ui, release, previous
+    exporter = run(['docker', 'create', '--network', 'none', '--entrypoint', '/bin/true', image])
+    try:
+        with tempfile.TemporaryDirectory(prefix='ui-export-', dir=ROOT) as directory:
+            artifact = Path(directory)
+            run(['docker', 'cp', exporter + ':/app/.', directory], timeout=240)
+            if not (artifact / 'index.html').is_file() or not (artifact / 'js').is_dir():
+                raise RuntimeError('UI artifact is incomplete')
+            run(['docker', 'exec', ui, 'mkdir', '-p', '/app/' + release])
+            run(['docker', 'cp', directory + '/.', ui + ':/app/' + release], timeout=240)
+    finally:
+        run(['docker', 'rm', exporter])
+    return ui, release, previous
+
+
+def switch_static(ui, release):
+    if release != '.' and not re.fullmatch(r'\.avalon-releases/[0-9a-f]{64}', release):
+        raise ValueError('Unexpected static release')
+    run(['docker', 'exec', ui, 'sh', '-eu', '-c', '''
+test -f "/app/$1/index.html"
+# Retain assets in both directions, including rollback: an open tab may
+# have fetched either version's HTML. Hard links avoid duplicating old files.
+if [ "$(readlink /app/.avalon-current)" != "$1" ]; then
+  for assets in js css img fonts; do
+    if [ -d "/app/.avalon-current/$assets" ]; then
+      mkdir -p "/app/$1/$assets"
+      cp -aln "/app/.avalon-current/$assets/." "/app/$1/$assets/"
+    fi
+  done
+fi
+ln -sfn "$1" /app/.avalon-next
+mv -Tf /app/.avalon-next /app/.avalon-current
+''', 'switch-static', release], timeout=240)
+
+
+def health():
+    # Watchdog may stop/recover LiveKit while backend restarts. Give it time.
+    deadline = time.monotonic() + 120
+    while True:
+        try:
+            status = run(['curl', '--silent', '--show-error', '--max-time', '5',
+                          '--output', '/dev/null', '--write-out', '%{http_code}',
+                          'http://127.0.0.1:7882/health/voice'])
+            run(['systemctl', 'is-active', '--quiet', 'avalon-production-watchdog.service'])
+            livekit = compose('ps', '--status', 'running', '-q', 'livekit')
+            if status == '204' and livekit and not Path('/var/lib/avalon-production-watchdog/latched').exists():
+                break
+        except (subprocess.SubprocessError, OSError):
+            pass
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Voice control did not become healthy')
+        time.sleep(3)
+    run(['curl', '--fail', '--silent', '--show-error', '--max-time', '15',
+         '--resolve', 'avalon-game.com:443:127.0.0.1', '--output', '/dev/null', 'https://avalon-game.com/'])
+    compose('exec', '-T', 'ui', 'nginx', '-t', '-c', '/etc/nginx/avalon-runtime.conf')
+    run(['docker', 'exec', '-i', '-w', '/app', 'avalon-production-backend-1', 'node', '-'], input=SMOKE, timeout=25)
+
+
+def activate():
+    compose('up', '-d', '--no-deps', '--pull', 'never', '--wait', '--wait-timeout', '150', 'backend')
+    health()
+
+
+def image_prune_candidates(images, protected):
+    """Retain the three highest complete stable release pairs and safety exceptions."""
+    releases = {repo: set() for repo in REPOS.values()}
+    parsed = {}
+    for image in images:
+        tags = image.get('RepoTags') or []
+        versions = []
+        for tag in tags:
+            match = re.fullmatch(r'(.+):v([0-9]+)\.([0-9]+)\.([0-9]+)', tag)
+            if not match or match[1] not in releases:
+                break
+            version = tuple(map(int, match.groups()[1:]))
+            releases[match[1]].add(version)
+            versions.append(version)
+        else:
+            if versions:
+                parsed[image['Id']] = versions
+    complete = set.intersection(*releases.values())
+    keep = set(sorted(complete, reverse=True)[:3])
+    return [image for image in images if image['Id'] not in protected
+            and image['Id'] in parsed
+            and all(version in complete - keep for version in parsed[image['Id']])]
+
+
+def prune_images():
+    """Called under deploy.lock only; fail closed if any protection cannot be resolved."""
+    if (ROOT / 'deploy-pending.json').exists():
+        raise RuntimeError('Cannot prune during an interrupted deployment')
+    refs = set()
+    for name in ('compose.production.yaml', 'compose.previous.yaml'):
+        resolved = run(['docker', 'compose', '-f', str(ROOT / name), 'config', '--images']).splitlines()
+        if not resolved:
+            raise RuntimeError('Cannot resolve protected Compose images')
+        refs.update(resolved)
+    refs.update(json.loads((ROOT / 'last-deploy.json').read_text())['images'].values())
+    if not refs:
+        raise RuntimeError('No protected image references')
+    protected = {image['Id'] for image in json.loads(run(['docker', 'image', 'inspect', *sorted(refs)]))}
+    containers = run(['docker', 'ps', '-aq']).split()
+    if containers:
+        protected.update(item['Image'] for item in json.loads(run(['docker', 'inspect', *containers])))
+    ids = sorted(set(run(['docker', 'image', 'ls', '-aq', '--no-trunc']).split()))
+    images = json.loads(run(['docker', 'image', 'inspect', *ids])) if ids else []
+    candidates = image_prune_candidates(images, protected)
+    before = shutil.disk_usage(ROOT).free
+    print(f'Image retention: keep 3 latest complete stable releases plus protected images; '
+          f'{len(candidates)} old images to remove', flush=True)
+    for image in candidates:
+        # No force: Docker refuses removal if a container starts using this image.
+        run(['docker', 'image', 'rm', *image['RepoTags']], timeout=240)
+        print('Image retention removed: ' + ', '.join(image['RepoTags']), flush=True)
+    freed = shutil.disk_usage(ROOT).free - before
+    print(f'Image retention complete: removed {len(candidates)} images; free-space change {freed} bytes', flush=True)
+
+
+def deploy(tag, check_only=False, skip_room_check=False):
+    parse_command('deploy ' + tag)
+    target = ROOT / 'compose.production.yaml'
+    pending = ROOT / 'deploy-pending.json'
+    with (ROOT / 'deploy.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if pending.exists():
+            raise RuntimeError('Previous deployment was interrupted: operator must inspect deploy-pending.json')
+        if shutil.disk_usage(ROOT).free < 5 * 1024**3:
+            raise RuntimeError('At least 5 GiB free space is required')
+        compose('config', '--quiet')
+        previous = target.read_text()
+        images = {}
+        print('Pulling both release images before changing production', flush=True)
+        for service, repository in REPOS.items():
+            run(['docker', 'pull', '--platform', 'linux/amd64', repository + ':' + tag], timeout=600)
+            digests = json.loads(run(['docker', 'image', 'inspect', '--format', '{{json .RepoDigests}}', repository + ':' + tag]))
+            images[service] = next(d for d in digests if d.startswith(repository + '@sha256:'))
+        candidate = replace_images(previous, images)
+        if check_only or candidate == previous:
+            health()
+            print('Preflight OK; ' + ('no changes requested' if check_only else 'release already installed'), flush=True)
+            return
+        print('Preparing UI while the existing site remains available', flush=True)
+        ui, release, previous_static = prepare_static(images['ui'])
+        if skip_room_check:
+            print('WARNING: room checks explicitly skipped; unfinished games may lose their state', flush=True)
+        else:
+            idle()
+        # Backups run independently on their timer; check rooms immediately before activation.
+        (ROOT / 'compose.previous.yaml').write_text(previous)
+        pending.write_text(json.dumps({'tag': tag, 'images': images, 'previousStatic': previous_static,
+                                       'uiContainer': ui, 'skipRoomCheck': skip_room_check, 'startedAt': time.time()}))
+        try:
+            write_compose(candidate)
+            compose('config', '--quiet')
+            print('Switching UI files and restarting backend; nginx stays running', flush=True)
+            switch_static(ui, release)
+            activate()
+            (ROOT / 'last-deploy.json').write_text(json.dumps({'tag': tag, 'images': images, 'skipRoomCheck': skip_room_check, 'completedAt': time.time()}))
+        except Exception:
+            print('Deployment failed; restoring previous application images', flush=True)
+            switch_static(ui, previous_static)
+            write_compose(previous)
+            activate()
+            pending.unlink()
+            print('Previous application restored; database was not rolled back', flush=True)
+            raise
+        pending.unlink()
+        print('Deployment healthy: ' + tag, flush=True)
+        try:
+            prune_images()
+        except Exception as error:
+            # A cleanup failure must never roll back an already healthy release.
+            print('WARNING: image retention failed (' + type(error).__name__ + '); inspect images manually', flush=True)
+
+
+def main():
+    os.umask(0o077)
+    # Internal mode is invoked only by the root-owned systemd service command.
+    if len(sys.argv) == 4 and sys.argv[1] == '--run' and not os.environ.get('SUDO_USER'):
+        mode, tag = parse_command(sys.argv[2])
+        if not re.fullmatch(r'[0-9a-f]{32}', sys.argv[3]):
+            raise ValueError('Invalid deployment invocation ID')
+        deploy(tag, check_only=mode == 'check', skip_room_check=mode == 'deploy-skip-rooms')
+        receipt = ROOT / ('deploy-result-' + sys.argv[3] + '.json')
+        temporary = receipt.with_suffix('.tmp')
+        temporary.write_text(json.dumps({'tag': tag, 'completedAt': time.time()}))
+        temporary.replace(receipt)
+        return
+    if len(sys.argv) != 2:
+        raise ValueError('One SSH command argument required')
+    mode, tag = parse_command(sys.argv[1])
+    if mode == 'check':
+        return deploy(tag, check_only=True)
+    # A disconnected/cancelled runner must not kill rollback. Each external operation
+    # has its own timeout; do not impose a service deadline that could kill rollback.
+    started = time.time()
+    invocation = uuid.uuid4().hex
+    receipt = ROOT / ('deploy-result-' + invocation + '.json')
+    try:
+        result = subprocess.run([
+            'systemd-run', '--unit=avalon-deploy', '--collect', '--wait', '--quiet',
+            '--property=UMask=0077',
+            '/usr/local/sbin/avalon-deploy', '--run', f'{mode} {tag}', invocation,
+        ])
+        subprocess.run(['journalctl', '-u', 'avalon-deploy', '--since=@' + str(int(started)), '--no-pager', '-o', 'cat'])
+        if result.returncode:
+            raise RuntimeError('Deployment failed; inspect avalon-deploy journal')
+        # systemd-run can return zero for an operator-stopped service too.
+        completed = json.loads(receipt.read_text()) if receipt.exists() else {}
+        if completed.get('tag') != tag or completed.get('completedAt', 0) < started:
+            raise RuntimeError('Deployment did not complete; inspect avalon-deploy journal')
+    finally:
+        receipt.unlink(missing_ok=True)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as error:
+        print('ERROR: ' + str(error), file=sys.stderr)
+        sys.exit(1)

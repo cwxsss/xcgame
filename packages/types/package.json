@@ -1,0 +1,12 @@
+{
+  "name": "@avalon/types",
+  "version": "75.12.4",
+  "description": "Typings for sharing between ui and backend",
+  "keywords": [],
+  "author": "@Razdva122",
+  "license": "MIT",
+  "dependencies": {
+    "@typegoose/typegoose": "~13.5.0",
+    "mongoose": "~9.9.5"
+  }
+}
