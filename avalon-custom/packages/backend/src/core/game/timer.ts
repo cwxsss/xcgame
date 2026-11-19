@@ -20,6 +20,7 @@ export class GameTimer {
   private isCustomTimer: boolean;
   private customTimerPlayerID?: string;
   private customTimerDurationSeconds = 60;
+  onExpiry?: (stage: TTimerStage) => void;
 
   constructor(game: Game, isCustomTimer?: boolean) {
     this.game = game;
@@ -87,7 +88,7 @@ export class GameTimer {
     this.pendingHistoryDelay = 0;
 
     // If there's a delay, set the timer to start in the future
-    const now = Date.now();
+    const now = this.game.runtime.now();
     const startTime = now + delay;
     this.currentTimer = {
       startTime: startTime,
@@ -97,34 +98,7 @@ export class GameTimer {
       expired: false,
     };
 
-    if (delay > 0) {
-      console.log(`[GameTimer] Timer for stage: ${stage} has ${delay / 1000}s delay before starting`);
-
-      const visibilityTimeoutId = setTimeout(() => {
-        // Notify clients that the timer is now visible
-        this.game.stateObserver.gameStateChanged();
-      }, delay);
-
-      // Store this timeout so we can clear it if needed
-      this.timers.set(`${stage}_visibility`, visibilityTimeoutId);
-    }
-
-    const timeoutId = setTimeout(
-      () => {
-        console.log(`[GameTimer] Timer callback triggered for stage: ${stage}`);
-        try {
-          this.handleTimerExpired(stage);
-        } catch (error) {
-          console.error(`[GameTimer] Critical error in timer callback for stage ${stage}:`, error);
-          if (error instanceof Error) {
-            console.error(`[GameTimer] Error stack:`, error.stack);
-          }
-        }
-      },
-      delay + duration * 1000,
-    );
-
-    this.timers.set(stage, timeoutId);
+    this.armCurrentTimer();
   }
 
   /**
@@ -137,7 +111,7 @@ export class GameTimer {
 
     console.log(`[GameTimer] Starting custom timer, duration: ${durationSeconds}s`);
 
-    const now = Date.now();
+    const now = this.game.runtime.now();
     this.currentTimer = {
       startTime: now,
       endTime: now + durationSeconds * 1000,
@@ -146,18 +120,7 @@ export class GameTimer {
       expired: false,
     };
 
-    const timeoutId = setTimeout(() => {
-      console.log(`[GameTimer] Custom timer expired`);
-      if (this.currentTimer) {
-        this.currentTimer.expired = true;
-      }
-      this.timers.delete('custom');
-
-      // Уведомить клиентов об истечении таймера
-      this.game.stateObserver.gameStateChanged();
-    }, durationSeconds * 1000);
-
-    this.timers.set('custom', timeoutId);
+    this.armCurrentTimer();
     this.game.stateObserver.gameStateChanged();
   }
 
@@ -183,25 +146,14 @@ export class GameTimer {
     const remainingTime = this.getRemainingTime();
     const newDuration = remainingTime + additionalSeconds * 1000;
 
-    const now = Date.now();
+    const now = this.game.runtime.now();
     this.currentTimer.startTime = now;
     this.currentTimer.endTime = now + newDuration;
     this.currentTimer.duration = newDuration;
     this.currentTimer.expired = false;
 
     // Создать новый таймаут
-    const newTimeoutId = setTimeout(() => {
-      console.log(`[GameTimer] Custom timer expired`);
-      if (this.currentTimer) {
-        this.currentTimer.expired = true;
-      }
-      this.timers.delete('custom');
-
-      // Уведомить клиентов об истечении таймера
-      this.game.stateObserver.gameStateChanged();
-    }, newDuration);
-
-    this.timers.set('custom', newTimeoutId);
+    this.armCurrentTimer();
     this.game.stateObserver.gameStateChanged();
   }
 
@@ -284,7 +236,7 @@ export class GameTimer {
       return 0;
     }
 
-    const elapsed = Date.now() - this.currentTimer.startTime;
+    const elapsed = this.game.runtime.now() - this.currentTimer.startTime;
     const remaining = this.currentTimer.duration - elapsed;
     return Math.max(0, remaining);
   }
@@ -307,7 +259,7 @@ export class GameTimer {
       return { ...player, active: false, isCustom: this.isCustomTimer };
     }
 
-    const now = Date.now();
+    const now = this.game.runtime.now();
 
     // Check if we're still in the delay period (timer hasn't started yet)
     if (now < this.currentTimer.startTime) {
@@ -350,7 +302,35 @@ export class GameTimer {
   /**
    * Handle timer expiration
    */
-  private handleTimerExpired(stage: TTimerStage): void {
+  armCurrentTimer(): void {
+    const timer = this.currentTimer;
+    if (this.game.runtime.replaying || !timer || timer.expired) return;
+    const delay = timer.startTime - this.game.runtime.now();
+    if (delay > 0) {
+      const visibility = setTimeout(() => this.game.stateObserver.gameStateChanged(), delay);
+      this.timers.set(`${timer.stage}_visibility`, visibility);
+    }
+    const timeout = setTimeout(() => {
+      try {
+        if (this.onExpiry) this.onExpiry(timer.stage);
+        else this.expire(timer.stage);
+      } catch (error) {
+        console.error('[GameTimer] Timer callback failed', error);
+      }
+    }, Math.max(0, timer.endTime - this.game.runtime.now()));
+    this.timers.set(timer.stage, timeout);
+  }
+
+  recoveryState() {
+    return {
+      current: this.currentTimer,
+      pendingHistoryDelay: this.pendingHistoryDelay,
+      customPlayer: this.customTimerPlayerID,
+      customDuration: this.customTimerDurationSeconds,
+    };
+  }
+
+  expire(stage: TTimerStage): void {
     if (this.currentTimer && this.currentTimer.stage === stage) {
       console.log(`[GameTimer] Timer expired for stage: ${stage}, current game stage: ${this.game.stage}`);
       this.currentTimer.expired = true;
@@ -360,6 +340,7 @@ export class GameTimer {
 
       // Для кастомного таймера не выполняем никаких действий по истечении
       if (stage === 'custom') {
+        this.game.stateObserver.gameStateChanged();
         return;
       }
 
@@ -379,7 +360,7 @@ export class GameTimer {
           break;
         case 'discardMissionCard': {
           this.game.clearSelectedPlayers();
-          const target = _.sample(this.game.currentMission.data.actions)!.player;
+          const target = this.game.runtime.sample(this.game.currentMission.data.actions)!.player;
           this.game.selectPlayer(this.game.leader.userID, target.userID);
           this.game.addons.trapper!.discardMissionCard(this.game.leader.userID);
           break;
@@ -414,7 +395,7 @@ export class GameTimer {
       );
 
       while (this.game.selectedPlayers.length < requiredPlayers) {
-        const randomPlayer = _.sample(availablePlayers);
+        const randomPlayer = this.game.runtime.sample(availablePlayers);
         if (randomPlayer) {
           this.game.selectPlayer(this.game.leader.userID, randomPlayer.userID);
           _.pull(availablePlayers, randomPlayer);
@@ -422,7 +403,7 @@ export class GameTimer {
       }
 
       while (this.game.selectedPlayers.length > requiredPlayers) {
-        const randomSelected = _.sample(this.game.selectedPlayers);
+        const randomSelected = this.game.runtime.sample(this.game.selectedPlayers);
         if (randomSelected) {
           this.game.selectPlayer(this.game.leader.userID, randomSelected.userID);
         }
@@ -450,7 +431,7 @@ export class GameTimer {
       }
 
       const teamMembers = this.game.players.filter((p) => p.features.isSent && p !== this.game.leader);
-      const randomMember = _.sample(teamMembers);
+      const randomMember = this.game.runtime.sample(teamMembers);
 
       if (randomMember) {
         this.game.selectPlayer(this.game.leader.userID, randomMember.userID);
@@ -471,7 +452,7 @@ export class GameTimer {
 
     for (const player of unvotedPlayers) {
       try {
-        const randomVote: TVoteOption = _.sample(['approve', 'reject'])!;
+        const randomVote: TVoteOption = this.game.runtime.sample(['approve', 'reject'])!;
         this.game.voteForMission(player.userID, randomVote);
         console.log(`[GameTimer] Auto-voted ${randomVote} for player ${player.userID}`);
       } catch (error) {
@@ -522,7 +503,7 @@ export class GameTimer {
     // Ensure exactly one valid player is selected
     if (validSelections.length === 0) {
       const otherPlayers = this.game.players.filter(functionOfValidatePlayers);
-      const randomPlayer = _.sample(otherPlayers);
+      const randomPlayer = this.game.runtime.sample(otherPlayers);
 
       if (randomPlayer) {
         this.game.selectPlayer(activePlayer.userID, randomPlayer.userID);
@@ -576,7 +557,7 @@ export class GameTimer {
     }
 
     if (this.game.stage === 'announceLoyalty') {
-      const randomLoyalty = _.sample(['good', 'evil'])!;
+      const randomLoyalty = this.game.runtime.sample(['good', 'evil'])!;
       if (this.game.addons.ladyOfLake && typeOfCheck === 'ladyOfLake') {
         this.game.addons.ladyOfLake.announceLoyalty(activePlayer.userID, randomLoyalty as 'good' | 'evil');
       } else if (this.game.addons.witch && typeOfCheck === 'witch') {
@@ -600,7 +581,7 @@ export class GameTimer {
     for (const missionAction of missionActions) {
       if (missionAction.value === 'unvoted') {
         try {
-          const action: TMissionResult = _.sample(missionAction.player.role.validMissionResult)!;
+          const action: TMissionResult = this.game.runtime.sample(missionAction.player.role.validMissionResult)!;
 
           this.game.actionOnMission(missionAction.player.userID, action);
           console.log(
@@ -657,12 +638,12 @@ export class GameTimer {
         // Select appropriate players based on target type
         if (targetType === 'merlin' || targetType === 'guinevere' || targetType === 'cleric') {
           // Need to select 1 player for merlin/guinevere/cleric
-          const randomGood = _.sample(goodPlayers);
+          const randomGood = this.game.runtime.sample(goodPlayers);
           if (randomGood) {
             this.game.selectPlayer(assassin.userID, randomGood.userID);
           }
         } else if (targetType === 'lovers') {
-          const selectedLovers = _.sampleSize(goodPlayers, 2);
+          const selectedLovers = this.game.runtime.sampleSize(goodPlayers, 2);
           for (const lover of selectedLovers) {
             this.game.selectPlayer(assassin.userID, lover.userID);
           }
@@ -696,7 +677,7 @@ export class GameTimer {
           const unselectedGood = goodPlayers.filter(
             (p) => !this.game.selectedPlayers.some((sp) => sp.userID === p.userID),
           );
-          const toSelect = _.sampleSize(unselectedGood, requiredSelections - currentSelections);
+          const toSelect = this.game.runtime.sampleSize(unselectedGood, requiredSelections - currentSelections);
 
           for (const player of toSelect) {
             this.game.selectPlayer(assassin.userID, player.userID);
@@ -710,7 +691,7 @@ export class GameTimer {
 
         // Execute the assassination with a random valid role
         if (progressData.possibleTargets && progressData.possibleTargets.length > 0) {
-          const randomRole = _.sample(progressData.possibleTargets);
+          const randomRole = this.game.runtime.sample(progressData.possibleTargets);
           this.game.addons.assassin.assassinate(assassin.userID, progressData.type, randomRole);
           console.log(`[GameTimer] Assassinate timeout: Auto-selected role ${randomRole} for custom assassination`);
         }

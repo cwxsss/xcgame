@@ -2,7 +2,6 @@ import { IGameAddon } from '@/core/game/addons/interface';
 import { Game } from '@/core/game';
 import type { TSwitchesArray } from '@/core/game/addons/lancelots/interface';
 import { SwitchLancelotsHistory } from '@/core/game/addons/lancelots/switch-lancelots';
-import * as _ from 'lodash';
 import { of } from 'rxjs';
 
 export class LancelotsAddon implements IGameAddon {
@@ -13,7 +12,7 @@ export class LancelotsAddon implements IGameAddon {
 
   constructor(game: Game) {
     this.game = game;
-    this.switches = _.shuffle([true, true, false, false, false]);
+    this.switches = this.game.runtime.shuffle([true, true, false, false, false]);
   }
 
   beforeSelectTeam() {

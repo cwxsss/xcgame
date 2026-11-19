@@ -81,6 +81,20 @@ test('only the current lobby host can assign and advance the shared manual timer
   handlers.setCustomTimerPlayer('missing', 'alice');
   handlers.nextCustomTimerPlayer('missing');
 });
+
+test('an active room with no connected players expires after the empty-room retention window', async () => {
+  const { manager, handlers } = fixture(true);
+  manager.createRoom('empty-live', 'alice', ['alice', 'bob', 'carol', 'dave', 'eve']);
+  const room = manager.rooms['empty-live'];
+  room.startGame();
+  await handlers.joinRoom('empty-live', () => {});
+  handlers.leaveRoom('empty-live');
+
+  expect(manager.rooms['empty-live']).toBe(room);
+  jest.advanceTimersByTime(30 * 60000);
+
+  expect(manager.rooms['empty-live']).toBeUndefined();
+});
 jest.mock('@/ai/service', () => ({
   AiService: class {
     register() {}
@@ -167,6 +181,13 @@ function fixture(auth = false) {
   };
   const db = {
     getLastRooms: async () => [],
+    getWaitingRoomSnapshots: async () => [],
+    getStartedRoomSnapshots: async () => [],
+    getWaitingRoomSnapshot: async () => null,
+    getStartedRoomSnapshot: async () => null,
+    saveWaitingRoomSnapshot: async () => {},
+    saveStartedRoomSnapshot: async () => {},
+    deleteWaitingRoomSnapshot: async () => {},
     getRoomFromDB: async (id: string) => (id === 'archive' ? { roomID: id, stage: 'started' } : null),
     getUserCompletedAchievements: async () => [],
   };

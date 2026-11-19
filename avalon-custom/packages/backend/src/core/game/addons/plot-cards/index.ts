@@ -13,7 +13,6 @@ import {
   finalize,
   race,
 } from 'rxjs';
-import * as _ from 'lodash';
 import { Game, IPlayerInGame } from '@/core/game';
 import { Dictionary, AddonsData, TPlotCardNames } from '@avalon/types';
 import { TPlotCard, ICurrentCardsState, ICardState, ICrossCardsStorage } from '@/core/game/addons/plot-cards/interface';
@@ -80,7 +79,7 @@ export class PlotCardsAddon implements IGameAddon {
       this.cardsPerRound = 1;
     }
 
-    this.cards = _.shuffle(cards.map((el) => new el(game, this)));
+    this.cards = game.runtime.shuffle(cards.map((el) => new el(game, this)));
   }
 
   get addonData(): AddonsData {

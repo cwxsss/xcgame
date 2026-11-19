@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import { SocketIO } from 'boardgame.io/multiplayer';
 import { Avalon } from './avalon';
@@ -11,6 +11,7 @@ import {
 } from './avalon-options';
 import { SplendorBoard } from './SplendorBoard';
 import { VoicePanel } from './VoicePanel';
+import { EntryAccessContext } from './EntryGate';
 import './lobby.css';
 import './tabletop.css';
 
@@ -181,8 +182,20 @@ function playerCount(counts) {
   return `${counts[0]}–${counts.at(-1)} 人`;
 }
 
+function safeGamePath(path) {
+  if (typeof path !== 'string' || !path.startsWith('/')) return null;
+  try {
+    const target = new URL(path, window.location.origin);
+    if (target.origin !== window.location.origin) return null;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 function Home() {
-  const [game, setGame] = useState('splendor');
+  const accessInfo = useContext(EntryAccessContext);
+  const [game, setGame] = useState(null);
   const [count, setCount] = useState(games.splendor.counts[0]);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -191,7 +204,16 @@ function Home() {
   const [joinError, setJoinError] = useState('');
   const [options, setOptions] = useState({ mode: 'base', customRoles: [] });
 
+  function configurationPath(key) {
+    return safeGamePath(accessInfo?.[`${key}Path`]);
+  }
+
   function selectGame(key) {
+    const path = configurationPath(key);
+    if (path) {
+      window.location.assign(path);
+      return;
+    }
     setGame(key);
     if (game !== key) setCount(games[key].counts[0]);
     setError('');
@@ -244,34 +266,55 @@ function Home() {
         <p>创建房间，把邀请链接发给朋友。大家入座后即可开局。</p>
       </section>
 
-      <section className="tt-games" aria-label="选择游戏">
-        {Object.entries(games).map(([key, item]) => (
-          <button
-            className={`tt-game tt-game--${key}`}
-            key={key}
-            type="button"
-            aria-pressed={game === key}
-            disabled={busy}
-            onClick={() => selectGame(key)}
-          >
-            <span className="tt-game-art" aria-hidden="true">
-              <span>{item.symbol}</span>
-            </span>
-            <span className="tt-game-info">
-              <span className="tt-game-meta">
-                {item.kind} · {playerCount(item.counts)}
-              </span>
-              <strong>{item.title}</strong>
-              <span>{item.description}</span>
-              <span className="tt-game-status">
-                {game === key ? '✓ 已选择' : '选择游戏'}
-              </span>
-            </span>
-          </button>
-        ))}
+      <section className="tt-step tt-step--games" aria-labelledby="tt-game-step">
+        <div className="tt-step-heading">
+          <span className="tt-step-number" aria-hidden="true">1</span>
+          <div>
+            <h2 id="tt-game-step">选择游戏</h2>
+            <p>先选择要玩的游戏，再设置人数和玩法。</p>
+          </div>
+        </div>
+        <div className="tt-games" aria-label="选择游戏">
+          {Object.entries(games).map(([key, item]) => {
+            const path = configurationPath(key);
+            return (
+              <button
+                className={`tt-game tt-game--${key}`}
+                key={key}
+                type="button"
+                aria-pressed={game === key}
+                disabled={busy}
+                onClick={() => selectGame(key)}
+              >
+                <span className="tt-game-art" aria-hidden="true">
+                  <span>{item.symbol}</span>
+                </span>
+                <span className="tt-game-info">
+                  <span className="tt-game-meta">
+                    {item.kind} · {playerCount(item.counts)}
+                  </span>
+                  <strong>{item.title}</strong>
+                  <span>{item.description}</span>
+                  <span className="tt-game-status">
+                    {path ? '进入配置' : game === key ? '✓ 已选择' : '选择游戏'}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      <div className="tt-actions">
+      {game && (
+        <section className="tt-step tt-step--config" aria-labelledby="tt-config-step">
+          <div className="tt-step-heading">
+            <span className="tt-step-number" aria-hidden="true">2</span>
+            <div>
+              <h2 id="tt-config-step">配置{games[game].title}</h2>
+              <p>填写昵称后创建房间，或输入好友分享的房间号加入。</p>
+            </div>
+          </div>
+          <div className="tt-actions">
         <form className="tt-panel" id="create-room" onSubmit={create}>
           <h2>创建{games[game].title}房间</h2>
           <label>
@@ -345,7 +388,9 @@ function Home() {
             </p>
           )}
         </form>
-      </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }

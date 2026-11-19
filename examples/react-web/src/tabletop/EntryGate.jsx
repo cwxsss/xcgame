@@ -3,6 +3,25 @@ import './entry.css';
 
 const ACCESS_ENDPOINT = '/access';
 
+export const EntryAccessContext = React.createContext(null);
+
+function readSafeNext() {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/avalon/')) return null;
+  try {
+    const target = new URL(next, window.location.origin);
+    if (
+      target.origin !== window.location.origin ||
+      !target.pathname.startsWith('/avalon/')
+    ) {
+      return null;
+    }
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 function getRetryAfter(response) {
   const value = Number.parseInt(response.headers.get('Retry-After') || '', 10);
   return Number.isFinite(value) && value > 0 ? value : 30;
@@ -10,7 +29,11 @@ function getRetryAfter(response) {
 
 async function readResponse(response) {
   try {
-    return await response.json();
+    const result = await response.json();
+    if (result.allowed && response.headers.get('x-xcgame-avalon-path') === '/avalon/') {
+      return { ...result, avalonPath: '/avalon/' };
+    }
+    return result;
   } catch {
     return {};
   }
@@ -18,6 +41,7 @@ async function readResponse(response) {
 
 export function EntryGate({ children }) {
   const [status, setStatus] = useState('checking');
+  const [accessInfo, setAccessInfo] = useState(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [retryAfter, setRetryAfter] = useState(0);
@@ -41,6 +65,7 @@ export function EntryGate({ children }) {
       }
 
       setStatus(result.allowed ? 'allowed' : 'locked');
+      setAccessInfo(result.allowed ? result : null);
       if (result.allowed) {
         setPassword('');
       }
@@ -92,6 +117,7 @@ export function EntryGate({ children }) {
 
       if (response.ok && result.allowed) {
         setPassword('');
+        setAccessInfo(result);
         setStatus('allowed');
         return;
       }
@@ -116,8 +142,18 @@ export function EntryGate({ children }) {
     }
   };
 
+  useEffect(() => {
+    if (status !== 'allowed') return;
+    const next = readSafeNext();
+    if (next) window.location.replace(next);
+  }, [status]);
+
   if (status === 'allowed') {
-    return children;
+    return (
+      <EntryAccessContext.Provider value={accessInfo}>
+        {children}
+      </EntryAccessContext.Provider>
+    );
   }
 
   if (status === 'checking') {

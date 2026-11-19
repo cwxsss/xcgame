@@ -3,6 +3,14 @@ import { PlayerGameSummary, StartedRoomState, TTotalWinrateStats, TWinrateStats,
 import { roomModel } from '@/db/models/';
 import { query } from '@/db/query';
 import { UserLayer } from '@/db/user';
+import {
+  WAITING_ROOM_SNAPSHOT_COLLECTION,
+  parseStartedRoomSnapshot,
+  parseWaitingRoomSnapshot,
+  type StartedRoomSnapshot,
+  type WaitingRoomSnapshot,
+  type WaitingRoomSnapshotDocument,
+} from '@/db/waiting-room-snapshot';
 
 export * from '@/db/init';
 
@@ -13,6 +21,7 @@ function validateID(id: unknown): asserts id is string {
 export class DBManager extends UserLayer {
   private statsCache?: { value: TTotalWinrateStats; expires: number };
   private statsPending?: Promise<TTotalWinrateStats>;
+  private waitingSnapshotIndexPromise?: Promise<void>;
   dbInstance: mongoose.Mongoose | undefined;
 
   constructor(dbInstance: mongoose.Mongoose | undefined) {
@@ -37,6 +46,88 @@ export class DBManager extends UserLayer {
     validateID(roomID);
     const room = await roomModel.findOne({ roomID });
     return room?.toObject() ?? null;
+  }
+
+  private waitingRoomSnapshots() {
+    return this.dbInstance?.connection.db?.collection<WaitingRoomSnapshotDocument>(WAITING_ROOM_SNAPSHOT_COLLECTION);
+  }
+
+  private ensureWaitingRoomSnapshotIndex() {
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return;
+    if (!this.waitingSnapshotIndexPromise) {
+      // The collection is private operational state.  Expiry is a safety net;
+      // Manager also checks expiresAt before restoring a snapshot.
+      this.waitingSnapshotIndexPromise = collection
+        .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'waiting-room-snapshot-expiry' })
+        .then(() => undefined)
+        .catch(() => undefined);
+    }
+  }
+
+  async saveWaitingRoomSnapshot(snapshot: WaitingRoomSnapshot): Promise<void> {
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return;
+    this.ensureWaitingRoomSnapshotIndex();
+    await collection.updateOne({ roomID: snapshot.roomID }, { $set: snapshot }, { upsert: true, ignoreUndefined: true });
+  }
+
+  async getWaitingRoomSnapshots(limit = 500): Promise<WaitingRoomSnapshot[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Invalid room limit');
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return [];
+    this.ensureWaitingRoomSnapshotIndex();
+    const docs = await collection
+      .find({ kind: 'waiting', stage: { $in: ['created', 'locked'] }, expiresAt: { $gt: new Date() } })
+      .sort({ createAt: 1 })
+      .limit(limit)
+      .toArray();
+    return docs.map(parseWaitingRoomSnapshot).filter((snapshot): snapshot is WaitingRoomSnapshot => snapshot !== null);
+  }
+
+  async getWaitingRoomSnapshot(roomID: string): Promise<WaitingRoomSnapshot | null> {
+    validateID(roomID);
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return null;
+    this.ensureWaitingRoomSnapshotIndex();
+    const doc = await collection.findOne({ kind: 'waiting', roomID, expiresAt: { $gt: new Date() } });
+    return parseWaitingRoomSnapshot(doc);
+  }
+
+  async saveStartedRoomSnapshot(snapshot: StartedRoomSnapshot): Promise<void> {
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return;
+    this.ensureWaitingRoomSnapshotIndex();
+    await collection.updateOne({ roomID: snapshot.roomID }, { $set: snapshot }, { upsert: true, ignoreUndefined: true });
+  }
+
+  async getStartedRoomSnapshots(limit = 500): Promise<StartedRoomSnapshot[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Invalid room limit');
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return [];
+    this.ensureWaitingRoomSnapshotIndex();
+    const docs = await collection
+      .find({ kind: 'started', stage: 'started', expiresAt: { $gt: new Date() } })
+      .sort({ createAt: 1 })
+      .limit(limit)
+      .toArray();
+    return docs.map(parseStartedRoomSnapshot).filter((snapshot): snapshot is StartedRoomSnapshot => snapshot !== null);
+  }
+
+  async getStartedRoomSnapshot(roomID: string): Promise<StartedRoomSnapshot | null> {
+    validateID(roomID);
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return null;
+    this.ensureWaitingRoomSnapshotIndex();
+    const doc = await collection.findOne({ kind: 'started', roomID, stage: 'started', expiresAt: { $gt: new Date() } });
+    return parseStartedRoomSnapshot(doc);
+  }
+
+  async deleteWaitingRoomSnapshot(roomID: string): Promise<void> {
+    validateID(roomID);
+    const collection = this.waitingRoomSnapshots();
+    if (!collection) return;
+    await collection.deleteOne({ roomID });
   }
 
   async getPlayerGames(playerID: string): Promise<VisualGameState[]> {

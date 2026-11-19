@@ -312,14 +312,17 @@ function ResultDialog({
           {scores.map((score, index) => {
             const champion = winners.has(String(score.playerID));
             const isSkipped = skipped.has(String(score.playerID));
-            const previous = scores[index - 1];
-            const tied =
-              previous &&
-              !isSkipped &&
-              !skipped.has(String(previous.playerID)) &&
-              previous.points === score.points &&
-              previous.cards === score.cards;
-            const rank = isSkipped ? '—' : tied ? index : index + 1;
+            // Use competition ranking for equal scores. The first three
+            // players with the same points and card count are all rank 1,
+            // and the next player is rank 4.
+            const firstMatchingIndex = scores.findIndex(
+              (candidate, candidateIndex) =>
+                candidateIndex <= index &&
+                !skipped.has(String(candidate.playerID)) &&
+                candidate.points === score.points &&
+                candidate.cards === score.cards,
+            );
+            const rank = isSkipped ? '—' : firstMatchingIndex + 1;
             return (
               <div
                 className={`splendor-result-row${champion ? ' is-champion' : ''}${isSkipped ? ' is-skipped' : ''}`}

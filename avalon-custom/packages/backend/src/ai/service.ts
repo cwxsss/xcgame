@@ -795,19 +795,23 @@ export class AiService {
       if (typeof cb !== 'function') return;
       try {
         const archived = (await this.archiveRepository?.recentSummaries()) || [];
+        const finishedBuiltin = (this.manager.roomsList ?? []).filter(
+          (room) => room.builtinBotCount && room.result && !this.manager.rooms[room.uuid],
+        );
         const live = Object.values(this.manager.rooms)
-          .filter((room) => room.ai)
+          .filter((room) => room.ai || room.roomBots?.length)
           .map((room) => room.calculateRoomState())
           .map<TRoomInfo>((room) => ({
             uuid: room.roomID,
-            ai: true,
+            ai: Boolean(room.ai),
+            builtinBotCount: room.roomBots?.length || undefined,
             aiStatus: room.ai?.status,
             aiModel: aiPlayedModel(room.ai),
             aiTitle: room.ai?.title,
             ...aiRosterInfo(room.ai, room.players.length),
             aiBeginner: room.ai?.beginner,
             aiBotDifficulty: room.ai?.botDifficulty,
-            aiLanguage: room.ai?.language ?? 'en',
+            aiLanguage: room.ai ? (room.ai.language ?? 'en') : undefined,
             hostID: room.leaderID,
             state: room.stage,
             options: room.options,
@@ -816,7 +820,7 @@ export class AiService {
             startAt: room.stage === 'started' ? room.startAt : undefined,
             result: room.stage === 'started' ? room.game.result : undefined,
           }));
-        const rooms = [...new Map([...archived, ...live].map((room) => [room.uuid, room])).values()]
+        const rooms = [...new Map([...archived, ...finishedBuiltin, ...live].map((room) => [room.uuid, room])).values()]
           .filter((room) => room.aiStatus !== 'stopped' && !this.manager.isLobbyRoomRemoved?.(room.uuid))
           .sort((a, b) => Date.parse(b.createAt) - Date.parse(a.createAt))
           .slice(0, 20);

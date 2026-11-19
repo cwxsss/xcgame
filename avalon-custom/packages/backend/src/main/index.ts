@@ -14,6 +14,8 @@ import { ChatRepository } from '@/room/chat-repository';
 import { registerStickerEndpoints } from '@/stickers/endpoints';
 import { StickersManager } from '@/stickers';
 import { Room } from '@/room';
+import { Chat } from '@/room/chat';
+import { GameManager } from '@/core/game-manager';
 import type {
   Dictionary,
   TRoomInfo,
@@ -32,8 +34,14 @@ import { GameResultWorker } from '@/scripts/game-results';
 import { DBManager } from '@/db';
 import { installSessionChecks } from '@/user/sessions';
 import { AvatarsManager } from '@/user/avatars';
+import {
+  WAITING_ROOM_SNAPSHOT_VERSION,
+  type StartedRoomSnapshot,
+  type WaitingRoomSnapshot,
+} from '@/db/waiting-room-snapshot';
 
 const roomRetentionMs = 30 * 60000;
+const startedRoomSnapshotRetentionMs = 24 * 60 * 60000;
 const roomCleanupRetryMs = 60000;
 
 export class Manager {
@@ -47,6 +55,16 @@ export class Manager {
   private removedLobbyRooms = new Set<string>();
   private roomAdminSessions = new WeakMap<ServerSocket, number>();
   private roomTimers = new Map<string, NodeJS.Timeout>();
+  private roomSnapshotWrites = new Map<string, Promise<void>>();
+  // Track when a live table becomes empty so disconnected test rooms expire.
+  private emptyRoomSince = new Map<string, number>();
+  // Do not expire rooms that were only created by the server (or restored in a
+  // test) and never had a connected player.  A room becomes eligible for the
+  // empty-table retention policy after the first successful room join.
+  private roomHasSeenOnline = new Set<string>();
+  /** Resolves after durable room snapshots have been loaded into memory. */
+  readonly initialized: Promise<void>;
+  private startupComplete = false;
   io: Server;
   dbManager: DBManager;
   onlineCounter: Dictionary<number> = Object.create(null);
@@ -72,13 +90,33 @@ export class Manager {
     )
       throw Error('roomLimit');
     this.rooms[uuid] = new Room(uuid, leaderID, players, this.io, options);
+    this.bindRoomPersistence(this.rooms[uuid]);
 
     this.updateRoomsList(this.rooms[uuid]);
+    this.queueRoomSnapshot(uuid);
+    this.scheduleRoomExpiry(uuid, roomRetentionMs);
+  }
 
+  private scheduleRoomExpiry(uuid: string, initialDelay: number) {
+    clearTimeout(this.roomTimers.get(uuid));
     const expire = () => {
       const room = this.rooms[uuid];
       if (!room) return;
       if (room.data.stage === 'started' && room.data.manager.game.stage !== 'end') {
+        if (this.roomHasSeenOnline.has(uuid) && (this.onlineCounter[uuid] || 0) === 0) {
+          const emptySince = this.emptyRoomSince.get(uuid) ?? Date.now();
+          this.emptyRoomSince.set(uuid, emptySince);
+          const emptyFor = Date.now() - emptySince;
+          if (emptyFor >= roomRetentionMs) {
+            this.destroyRoom(uuid);
+            return;
+          }
+          const timer = setTimeout(expire, Math.min(5 * 60000, roomRetentionMs - emptyFor));
+          timer.unref();
+          this.roomTimers.set(uuid, timer);
+          return;
+        }
+        this.emptyRoomSince.delete(uuid);
         const timer = setTimeout(expire, 5 * 60000);
         timer.unref();
         this.roomTimers.set(uuid, timer);
@@ -86,9 +124,137 @@ export class Manager {
         this.destroyRoom(uuid);
       }
     };
-    const timer = setTimeout(expire, roomRetentionMs);
+    const timer = setTimeout(expire, Math.max(0, initialDelay));
     timer.unref();
     this.roomTimers.set(uuid, timer);
+  }
+
+  private queueRoomPersistence(uuid: string, operation: () => Promise<void>): Promise<void> {
+    const previous = this.roomSnapshotWrites.get(uuid) || Promise.resolve();
+    const current = previous.catch(() => {}).then(operation);
+    this.roomSnapshotWrites.set(uuid, current);
+    void current.catch(() => console.error(`Room snapshot persistence failed: ${uuid}`)).finally(() => {
+      if (this.roomSnapshotWrites.get(uuid) === current) this.roomSnapshotWrites.delete(uuid);
+    });
+    return current;
+  }
+
+  private bindRoomPersistence(room: Room) {
+    room.onChatMessage = () => {
+      void this.queueRoomSnapshot(room.roomID);
+    };
+  }
+
+  private queueRoomSnapshot(uuid: string): Promise<void> {
+    return this.queueRoomPersistence(uuid, async () => {
+      if (this.removedLobbyRooms.has(uuid)) {
+        await this.dbManager.deleteWaitingRoomSnapshot(uuid);
+        return;
+      }
+      const room = this.rooms[uuid];
+      if (!room || room.ai) {
+        await this.dbManager.deleteWaitingRoomSnapshot(uuid);
+        return;
+      }
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + roomRetentionMs);
+      if (room.data.stage === 'created' || room.data.stage === 'locked') {
+        const snapshot: WaitingRoomSnapshot = {
+          snapshotVersion: WAITING_ROOM_SNAPSHOT_VERSION,
+          kind: 'waiting',
+          roomID: room.roomID,
+          stage: room.data.stage,
+          leaderID: room.leaderID,
+          players: [...room.players],
+          options: structuredClone(room.options),
+          roomBots: structuredClone(room.roomBots),
+          chat: structuredClone(room.chat.history),
+          createAt: room.createAt,
+          updatedAt: now,
+          expiresAt: new Date(Math.min(expiresAt.getTime(), Date.parse(room.createAt) + roomRetentionMs)),
+        };
+        await this.dbManager.saveWaitingRoomSnapshot(snapshot);
+        return;
+      }
+
+      if (room.data.manager.game.stage === 'end') {
+        // Keep the last active checkpoint until GameResultWorker confirms the
+        // terminal archive.  A crash between gameEnded and the DB write must
+        // remain recoverable rather than becoming a lost game.
+        return;
+      }
+      const gameRecovery = room.data.manager.recoverySnapshot();
+      if (!gameRecovery) {
+        await this.dbManager.deleteWaitingRoomSnapshot(uuid);
+        return;
+      }
+      const snapshot: StartedRoomSnapshot = {
+        snapshotVersion: WAITING_ROOM_SNAPSHOT_VERSION,
+        kind: 'started',
+        roomID: room.roomID,
+        stage: 'started',
+        leaderID: room.leaderID,
+        players: [...room.players],
+        options: structuredClone(room.options),
+        roomBots: structuredClone(room.roomBots),
+        chat: structuredClone(room.chat.history),
+        createAt: room.createAt,
+        startAt: room.startAt || new Date().toISOString(),
+        gameRecovery,
+        updatedAt: now,
+        expiresAt: new Date(now.getTime() + startedRoomSnapshotRetentionMs),
+      };
+      await this.dbManager.saveStartedRoomSnapshot(snapshot);
+    });
+  }
+
+  private restoreWaitingRoom(snapshot: WaitingRoomSnapshot): Room | undefined {
+    if (this.removedLobbyRooms.has(snapshot.roomID) || this.rooms[snapshot.roomID]) return this.rooms[snapshot.roomID];
+    const age = Date.now() - Date.parse(snapshot.createAt);
+    const remaining = roomRetentionMs - age;
+    if (remaining <= 0) {
+      void this.dbManager.deleteWaitingRoomSnapshot(snapshot.roomID);
+      return undefined;
+    }
+    const room = new Room(snapshot.roomID, snapshot.leaderID, [...snapshot.players], this.io, structuredClone(snapshot.options));
+    this.bindRoomPersistence(room);
+    room.createAt = snapshot.createAt;
+    room.data = { stage: snapshot.stage };
+    room.roomBots = structuredClone(snapshot.roomBots);
+    room.chat = new Chat();
+    snapshot.chat.forEach((entry) => room.chat.append(structuredClone(entry)));
+    this.rooms[snapshot.roomID] = room;
+    this.updateRoomsList(room);
+    this.scheduleRoomExpiry(snapshot.roomID, remaining);
+    return room;
+  }
+
+  private restoreStartedRoom(snapshot: StartedRoomSnapshot): Room | undefined {
+    if (this.removedLobbyRooms.has(snapshot.roomID) || this.rooms[snapshot.roomID]) return this.rooms[snapshot.roomID];
+    try {
+      const room = new Room(snapshot.roomID, snapshot.leaderID, [...snapshot.players], this.io, structuredClone(snapshot.options));
+      this.bindRoomPersistence(room);
+      room.createAt = snapshot.createAt;
+      room.roomBots = structuredClone(snapshot.roomBots);
+      room.chat = new Chat();
+      snapshot.chat.forEach((entry) => room.chat.append(structuredClone(entry)));
+      const manager = GameManager.restore(this.io, snapshot.roomID, snapshot.gameRecovery);
+      room.attachRecoveredManager(manager, snapshot.startAt);
+      this.rooms[snapshot.roomID] = room;
+      this.roomHasSeenOnline.add(snapshot.roomID);
+      this.emptyRoomSince.set(snapshot.roomID, Date.now());
+      manager.onRecoveryChanged = () => {
+        void this.queueRoomSnapshot(snapshot.roomID);
+      };
+      this.updateRoomsList(room);
+      this.scheduleRoomExpiry(snapshot.roomID, roomRetentionMs);
+      room.scheduleBuiltinBots();
+      return room;
+    } catch (error) {
+      console.error(`Could not restore room ${snapshot.roomID}`, error);
+      return undefined;
+    }
   }
 
   updateRoomsList(roomOrID: Room | string, removeRoom: boolean = false) {
@@ -112,6 +278,7 @@ export class Manager {
     } else {
       const roomData: TRoomInfo = {
         ai: Boolean(room.ai),
+        builtinBotCount: room.roomBots?.length || undefined,
         aiStatus: room.ai?.status,
         aiModel: aiPlayedModel(room.ai),
         aiTitle: room.ai?.title,
@@ -152,6 +319,7 @@ export class Manager {
     const roomsInfo = rooms.map<TRoomInfo>((room) => {
       return {
         ai: Boolean(room.ai),
+        builtinBotCount: room.roomBots?.length || undefined,
         aiStatus: room.ai?.status,
         aiModel: aiPlayedModel(room.ai),
         aiTitle: room.ai?.title,
@@ -251,6 +419,8 @@ export class Manager {
   private releaseRoom(uuid: string) {
     clearTimeout(this.roomTimers.get(uuid));
     this.roomTimers.delete(uuid);
+    this.emptyRoomSince.delete(uuid);
+    this.roomHasSeenOnline.delete(uuid);
     const room = this.rooms[uuid];
     room?.stopBuiltinBots?.();
     if (room?.data.stage === 'started') {
@@ -262,6 +432,8 @@ export class Manager {
     const completed = room?.data.stage === 'started' && room.data.manager.game.stage === 'end';
     if (!completed) this.updateRoomsList(uuid, true);
     delete this.rooms[uuid];
+    if (!completed || this.removedLobbyRooms.has(uuid))
+      void this.queueRoomPersistence(uuid, () => this.dbManager.deleteWaitingRoomSnapshot(uuid));
     this.io.to(roomChannel(uuid)).emit('destroyRoom', uuid);
   }
 
@@ -287,9 +459,12 @@ export class Manager {
       io,
     );
 
-    void Promise.allSettled([
+    this.startupComplete = !dbManager.dbInstance;
+    this.initialized = Promise.allSettled([
       this.dbManager.getLastRooms(20),
       this.aiService.archiveRepository?.recent(20) || Promise.resolve([]),
+      this.dbManager.getWaitingRoomSnapshots(500),
+      this.dbManager.getStartedRoomSnapshots(500),
     ]).then(async (results) => {
       try {
         if (this.dbManager.dbInstance?.connection.db) {
@@ -297,16 +472,37 @@ export class Manager {
         }
       } catch {
         console.error('Could not load removed lobby rooms');
+        this.startupComplete = true;
         return;
       }
-      this.generateRoomsListFromDB(results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])));
+      const waiting = results[2].status === 'fulfilled' ? results[2].value : [];
+      const started = results[3].status === 'fulfilled' ? results[3].value : [];
+      const archives = [
+        ...(results[0].status === 'fulfilled' ? results[0].value : []),
+        ...(results[1].status === 'fulfilled' ? results[1].value : []),
+      ];
+      const archivedIDs = new Set(archives.map((room) => room.roomID));
+      waiting.forEach((snapshot) => this.restoreWaitingRoom(snapshot));
+      started.forEach((snapshot) => {
+        if (archivedIDs.has(snapshot.roomID)) void this.dbManager.deleteWaitingRoomSnapshot(snapshot.roomID);
+        else this.restoreStartedRoom(snapshot);
+      });
+      this.generateRoomsListFromDB(archives);
       if (results.some((result) => result.status === 'rejected'))
         console.error('Could not load part of the saved rooms list');
+      this.startupComplete = true;
     });
 
     eventBus.on('roomUpdated', (room) => {
       this.updateRoomsList(room);
       const roomID = typeof room === 'string' ? room : room.roomID;
+      const live = this.rooms[roomID];
+      if (live?.data.stage === 'started' && !live.ai && !live.data.manager.onRecoveryChanged) {
+        live.data.manager.onRecoveryChanged = () => {
+          void this.queueRoomSnapshot(roomID);
+        };
+      }
+      void this.queueRoomSnapshot(roomID);
       this.io.to(roomChannel(roomID)).emit('voiceStateChanged', roomID);
       void this.voice.reconcile(roomID);
     });
@@ -327,7 +523,10 @@ export class Manager {
         if (!room || room.ai) return;
         const state = room.calculateRoomState();
         if (state.stage === 'started')
-          void results.submit(state).catch(() => console.error('Game result save failed; will retry'));
+          void results
+            .submit(state)
+            .then(() => this.queueRoomPersistence(roomID, () => this.dbManager.deleteWaitingRoomSnapshot(roomID)))
+            .catch(() => console.error('Game result save failed; will retry'));
       });
     }
 
@@ -375,17 +574,28 @@ export class Manager {
       registerVoiceEndpoints(this.voice, socket, userState.userID);
 
       socket.on('joinRoom', async (uuid, cb) => {
+        if (!this.startupComplete) await this.initialized;
         if (!validID(uuid)) throw Error('invalidRequest');
-        const room = this.rooms[uuid];
+        let room: Room | undefined = this.rooms[uuid];
         const gameFromDB = room
           ? null
           : (await this.dbManager.getRoomFromDB(uuid)) || (await this.aiService.archiveRepository?.load(uuid));
+
+        if (!room && !gameFromDB) {
+          const snapshot = await this.dbManager.getWaitingRoomSnapshot(uuid);
+          if (snapshot) room = this.restoreWaitingRoom(snapshot);
+          if (!room) {
+            const startedSnapshot = await this.dbManager.getStartedRoomSnapshot(uuid);
+            if (startedSnapshot) room = this.restoreStartedRoom(startedSnapshot);
+          }
+        }
 
         if (room || gameFromDB) {
           if (!socket.rooms.has(roomChannel(uuid))) {
             if ([...socket.rooms].filter((id) => id.startsWith('room:')).length >= 20) throw Error('roomLimit');
             await socket.join(roomChannel(uuid));
             this.updateOnlineCounter(uuid, 1);
+            if (room) this.roomHasSeenOnline.add(uuid);
           }
         }
 
@@ -421,7 +631,8 @@ export class Manager {
         }
       });
 
-      socket.on('getRoomsList', (cb) => {
+      socket.on('getRoomsList', async (cb) => {
+        if (!this.startupComplete) await this.initialized;
         socket.join('lobby');
         cb(this.roomListCutted);
       });
@@ -490,10 +701,14 @@ export class Manager {
     socket.on('deleteLobbyRoom', async (uuid, cb) => {
       if (!hasRoomAdmin()) return cb({ error: 'forbidden' });
       try {
+        const snapshot = !this.rooms[uuid]
+          ? (await this.dbManager.getWaitingRoomSnapshot(uuid)) || (await this.dbManager.getStartedRoomSnapshot(uuid))
+          : null;
         if (
           !this.rooms[uuid] &&
           !this.roomsList.some((room) => room.uuid === uuid) &&
-          !(await this.aiService.archiveRepository?.load(uuid))
+          !(await this.aiService.archiveRepository?.load(uuid)) &&
+          !snapshot
         ) return cb(false);
         await this.dbManager.markLobbyRoomRemoved(uuid);
         this.removedLobbyRooms.add(uuid);
@@ -536,7 +751,8 @@ export class Manager {
       cb(result);
     });
 
-    socket.on('createRoom', (cb) => {
+    socket.on('createRoom', async (cb) => {
+      if (!this.startupComplete) await this.initialized;
       const uuid = crypto.randomUUID();
       this.createRoom(uuid, userID, [userID]);
       cb(uuid);
@@ -607,6 +823,7 @@ export class Manager {
       const room = this.rooms[uuid];
       if (room && !room.ai && room.leaderID === userID) {
         room.startVoteFor('endGame');
+        eventBus.emit('roomUpdated', room);
       }
     });
 
@@ -614,6 +831,7 @@ export class Manager {
       const room = this.rooms[uuid];
       if (room && !room.ai && room.leaderID === userID) {
         room.startVoteFor('endAndRestartGame');
+        eventBus.emit('roomUpdated', room);
       }
     });
 
@@ -621,6 +839,7 @@ export class Manager {
       const room = this.rooms[uuid];
       if (room && !room.ai && room.leaderID === userID) {
         room.shuffle();
+        eventBus.emit('roomUpdated', room);
       }
     });
 
@@ -628,6 +847,7 @@ export class Manager {
       const room = this.rooms[uuid];
       if (room) {
         room.makeVote(userID, result);
+        eventBus.emit('roomUpdated', room);
       }
     });
 
@@ -849,7 +1069,10 @@ export class Manager {
 
     this.onlineCounter[id] = this.onlineCounter[id] || 0;
     this.onlineCounter[id] += diff;
-    if (this.onlineCounter[id] === 0) delete this.onlineCounter[id];
+    if (this.onlineCounter[id] === 0) {
+      delete this.onlineCounter[id];
+      if (diff === -1 && this.roomHasSeenOnline.has(id)) this.emptyRoomSince.set(id, Date.now());
+    }
     const emitName = id === 'lobby' ? 'onlineCounterUpdated' : 'roomOnlineUpdated';
     this.io.to(id === 'lobby' ? 'lobby' : roomChannel(id)).emit(emitName, this.onlineCounter[id] || 0);
   }

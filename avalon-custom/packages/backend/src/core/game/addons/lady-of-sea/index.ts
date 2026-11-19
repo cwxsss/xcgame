@@ -22,7 +22,7 @@ export class LadyOfSeaAddon extends LadyOfLakeAddon implements IGameAddon {
       .sort((a, b) => evilRolesImportance[<TEvilRoles>a] - evilRolesImportance[<TEvilRoles>b]);
 
     this.loyaltyTargets = ['good', ...validEvilRoles];
-    this.fakeEvilRole = _.sample(validEvilRoles)!;
+    this.fakeEvilRole = this.game.runtime.sample(validEvilRoles)!;
   }
 
   get addonData(): AddonsData {

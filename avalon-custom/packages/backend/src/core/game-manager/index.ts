@@ -1,5 +1,7 @@
 import { roomChannel, userChannel } from '@/helpers/channels';
 import { Game } from '@/core/game';
+import { GameRuntime } from '@/core/game/runtime';
+import { createHash } from 'node:crypto';
 import type { TRoomState, TGameMethodsParams, TGetLoyaltyData } from '@/core/game-manager/interface';
 import { eventBus } from '@/helpers';
 import { Mission } from '@/core/game/history/mission';
@@ -24,9 +26,28 @@ import {
   MissionWithResult,
   TLoyalty,
   TRoles,
+  TTimerStage,
 } from '@avalon/types';
 
 export * from '@/core/game-manager/interface';
+
+type SelectedRole = { userID: string; role: TRoles };
+type RecoveryAction = { at: number } & (
+  | { player: string; move: TGameMethodsParams }
+  | { expiredTimer: TTimerStage }
+);
+
+/** Private server checkpoint. Never pass this data through a room socket response. */
+export interface GameRecoverySnapshot {
+  version: 1;
+  seed: string;
+  startTime: number;
+  players: string[];
+  options: GameOptions;
+  selectedRoles?: SelectedRole | SelectedRole[];
+  actions: RecoveryAction[];
+  fingerprint: string;
+}
 
 export class GameManager {
   game: Game;
@@ -34,6 +55,8 @@ export class GameManager {
   roomState!: TRoomState;
   /** Hook used by a room-local built-in bot runner after every authoritative state change. */
   onStateChanged?: () => void;
+  onRecoveryChanged?: () => void;
+  private recovery?: Omit<GameRecoverySnapshot, 'fingerprint'>;
   io: Server;
   roomID: string;
 
@@ -42,20 +65,82 @@ export class GameManager {
     options: GameOptions,
     io: Server,
     roomID: string,
-    selectedRole?: { userID: string; role: TRoles } | Array<{ userID: string; role: TRoles }>,
+    selectedRole?: SelectedRole | SelectedRole[],
     useLegacyAiAssassin = false,
+    restoring?: GameRecoverySnapshot,
   ) {
     this.roomID = roomID;
     this.io = io;
-    this.game = new Game(
-      userIDs,
-      options,
-      { gameStateChanged: () => this.gameStateChanged() },
-      undefined,
-      selectedRole,
-      useLegacyAiAssassin,
+    const runtime = new GameRuntime(restoring?.seed);
+    runtime.replaying = Boolean(restoring);
+    const startTime = restoring?.startTime ?? Date.now();
+    if (!useLegacyAiAssassin) {
+      this.recovery = {
+        version: 1,
+        seed: runtime.seed,
+        startTime,
+        players: [...userIDs],
+        options: structuredClone(options),
+        selectedRoles: structuredClone(selectedRole),
+        actions: [],
+      };
+    }
+    this.game = runtime.at(startTime, () =>
+      new Game(
+        userIDs,
+        options,
+        { gameStateChanged: () => this.gameStateChanged() },
+        undefined,
+        selectedRole,
+        useLegacyAiAssassin,
+        runtime,
+      ),
     );
+    this.game.timer.onExpiry = (expiredTimer) => this.recordRecoveryAction({ at: Date.now(), expiredTimer });
     this.initRoomState();
+  }
+
+  recoverySnapshot(): GameRecoverySnapshot | undefined {
+    return this.recovery && { ...structuredClone(this.recovery), fingerprint: this.recoveryFingerprint() };
+  }
+
+  static restore(io: Server, roomID: string, snapshot: GameRecoverySnapshot): GameManager {
+    if (snapshot.version !== 1 || !/^[a-f0-9]{64}$/.test(snapshot.seed)) throw Error('Unsupported game checkpoint');
+    const manager = new GameManager(snapshot.players, snapshot.options, io, roomID, snapshot.selectedRoles, false, snapshot);
+    for (const action of snapshot.actions) manager.recordRecoveryAction(action);
+    if (snapshot.fingerprint !== manager.recoveryFingerprint() || manager.game.stage === 'end') {
+      throw Error('Game checkpoint did not reproduce an active game');
+    }
+    manager.game.runtime.replaying = false;
+    manager.game.timer.armCurrentTimer();
+    manager.initRoomState();
+    return manager;
+  }
+
+  private recoveryFingerprint(): string {
+    const { stage, turn, round, players, visibleRolesState, result, addonsData, vote, missions, timer } = this.game;
+    return createHash('sha256')
+      .update(JSON.stringify({
+        stage, turn, round, result, addonsData, visibleRolesState,
+        players: players.map((player) => ({ id: player.userID, role: player.role.role, features: player.features })),
+        vote: vote?.data.votes.map(({ player, value, preVote }) => [player.userID, value, preVote]),
+        missions: missions.map((mission) => ({
+          stage: mission.stage,
+          actions: mission.data.actions.map(({ player, value }) => [player.userID, value]),
+        })),
+        timer: timer.recoveryState(),
+        history: this.roomState.history.map((entry) => entry({ game: this.game })),
+      }))
+      .digest('hex');
+  }
+
+  private recordRecoveryAction(action: RecoveryAction) {
+    this.game.runtime.at(action.at, () => {
+      if ('expiredTimer' in action) this.game.timer.expire(action.expiredTimer);
+      else this.applyGameMethod(action.player, action.move);
+    });
+    this.recovery?.actions.push(structuredClone(action));
+    if (!this.game.runtime.replaying) this.onRecoveryChanged?.();
   }
 
   /**
@@ -105,6 +190,7 @@ export class GameManager {
 
     this.roomState.timer = this.game.timer.getTimerState();
 
+    if (this.game.runtime.replaying) return;
     if (this.game.result) {
       eventBus.emit('roomUpdated', this.roomID);
     }
@@ -222,6 +308,10 @@ export class GameManager {
   }
 
   callGameMethods(userID: string, params: TGameMethodsParams): void {
+    this.recordRecoveryAction({ at: Date.now(), player: userID, move: params });
+  }
+
+  private applyGameMethod(userID: string, params: TGameMethodsParams): void {
     switch (params.method) {
       // Core game methods
       case 'voteForMission':

@@ -151,9 +151,22 @@ export class Room {
       startAt: this.startAt,
       manager,
     };
-    this.botRunner = this.roomBots.length ? new BuiltinBotRunner(manager, new Set(this.roomBots.map((bot) => bot.id))) : undefined;
-    manager.onStateChanged = () => this.botRunner?.schedule();
+    this.attachRecoveredManager(manager, this.startAt);
     this.updateRoomState(true);
+    this.scheduleBuiltinBots();
+  }
+
+  /** Attach a replayed authoritative manager without emitting intermediate state. */
+  attachRecoveredManager(manager: GameManager, startAt: string) {
+    this.startAt = startAt;
+    this.data = { stage: 'started', startAt, manager };
+    this.botRunner = this.roomBots.length
+      ? new BuiltinBotRunner(manager, new Set(this.roomBots.map((bot) => bot.id)))
+      : undefined;
+    manager.onStateChanged = () => this.botRunner?.schedule();
+  }
+
+  scheduleBuiltinBots() {
     this.botRunner?.schedule();
   }
 

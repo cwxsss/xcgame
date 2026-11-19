@@ -4,12 +4,11 @@ import { PlotCardsAddon } from '@/core/game/addons/plot-cards';
 import { ILoyaltyActionHandler } from '@/core/game/addons/check-loyalty/interface';
 import { TPlotCard } from '@/core/game/addons/plot-cards/interface';
 import { LoyaltyChecker } from '@/core/game/addons/check-loyalty/loyalty-checker';
-import { v4 as uuidv4 } from 'uuid';
 
 export abstract class AbstractCard {
   abstract name: TPlotCardNames;
   abstract type: 'instant' | 'usable' | 'effect';
-  id: string = uuidv4();
+  id: string;
   ownerID: string | undefined;
   stage: 'has' | 'active' | undefined;
   game: Game;
@@ -30,6 +29,7 @@ export abstract class AbstractCard {
   playType: 'parallel' | 'sequentially' = 'sequentially';
 
   constructor(game: Game, plotCardsAddon: PlotCardsAddon) {
+    this.id = game.runtime.uuid();
     this.game = game;
     this.plotCardsAddon = plotCardsAddon;
   }

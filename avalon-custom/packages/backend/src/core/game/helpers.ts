@@ -1,4 +1,3 @@
-import * as _ from 'lodash';
 
 import {
   TRoles,
@@ -76,7 +75,7 @@ export function generateRolesForGame(settings: GameSettings, options: GameOption
     gameRoles.push(new roles.servant(game));
   }
 
-  const characters = _.shuffle(gameRoles);
+  const characters = game.runtime.shuffle(gameRoles);
 
   return {
     characters,

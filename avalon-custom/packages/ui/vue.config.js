@@ -38,6 +38,31 @@ module.exports = defineConfig({
   },
   chainWebpack: (config) => {
     config.plugin('locale-generation').use(LocaleGenerationPlugin);
+    if (hallBase) {
+      config.plugin('avalon-hall-css-assets').use({
+        apply(compiler) {
+          compiler.hooks.thisCompilation.tap('avalon-hall-css-assets', (compilation) => {
+            const { Compilation, sources } = compiler.webpack;
+            compilation.hooks.processAssets.tap(
+              {
+                name: 'avalon-hall-css-assets',
+                stage: Compilation.PROCESS_ASSETS_STAGE_SUMMARIZE,
+              },
+              (assets) => {
+                for (const [filename, asset] of Object.entries(assets)) {
+                  if (!filename.endsWith('.css')) continue;
+                  const source = asset.source().toString();
+                  const fixed = source.replaceAll('../avalon/img/', '../img/');
+                  if (fixed !== source) {
+                  compilation.updateAsset(filename, new sources.RawSource(fixed));
+                  }
+                }
+              },
+            );
+          });
+        },
+      });
+    }
     // Keep images out of JavaScript and give every image a cacheable file URL.
     config.module.rule('images').type('asset/resource').set('generator', imageAssets);
     config.plugin('html').tap((args) => {

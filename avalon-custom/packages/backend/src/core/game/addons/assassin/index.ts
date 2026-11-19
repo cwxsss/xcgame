@@ -63,7 +63,7 @@ export class AssassinAddon implements IGameAddon<TAssassinateOptions> {
     let assassin = this.game.players.find((player) => player.features.isAssassin);
     // The legacy model-driven AI rooms use fixed rosters without an Assassin card.
     if (!assassin && this.game.useLegacyAiAssassin) {
-      assassin = _.sample(this.game.players.filter((player) => player.role.loyalty === 'evil'));
+      assassin = this.game.runtime.sample(this.game.players.filter((player) => player.role.loyalty === 'evil'));
     }
     if (assassin) {
       this.game.stage = 'assassinate';

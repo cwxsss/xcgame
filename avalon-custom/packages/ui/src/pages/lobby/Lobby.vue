@@ -234,14 +234,6 @@ export default defineComponent({
     };
     const online = ref<number>();
 
-    socket
-      .timeout(10000)
-      .emitWithAck('getOnlineCounter', 'lobby')
-      .then((counter) => {
-        if (typeof counter === 'number') online.value = counter;
-      })
-      .catch(() => {});
-
     const initState = async () => {
       roomsError.value = '';
       try {
@@ -339,8 +331,6 @@ export default defineComponent({
       }
     };
 
-    void initState();
-
     const createRoom = async () => {
       if (!store.state.profile) {
         eventBus.emit('openAuthModal', createRoom);
@@ -404,7 +394,24 @@ export default defineComponent({
     const updateOnline = (counter: number) => {
       online.value = counter;
     };
+    const refreshLobby = () => {
+      // Socket.IO queues emits while connecting, but a disconnected lobby
+      // should wait for the connect event so the initial request is not
+      // duplicated by the first reconnect.
+      if (!socket.connected) return;
+      void initState();
+      void socket
+        .timeout(10000)
+        .emitWithAck('getOnlineCounter', 'lobby')
+        .then((counter) => {
+          if (typeof counter === 'number') online.value = counter;
+        })
+        .catch(() => {});
+      if (filter.value === 'ai-games') void loadAiRooms();
+    };
     socket.on('onlineCounterUpdated', updateOnline);
+    socket.on('connect', refreshLobby);
+    if (socket.connected) void refreshLobby();
     const resetAdminStatus = () => {
       adminUnlocked.value = false;
       deleteDialog.value = false;
@@ -416,6 +423,7 @@ export default defineComponent({
       aiRefreshPending = false;
       socket.off('roomsListUpdated', updateRooms);
       socket.off('onlineCounterUpdated', updateOnline);
+      socket.off('connect', refreshLobby);
       socket.off('disconnect', resetAdminStatus);
       adminUnlocked.value = false;
     });

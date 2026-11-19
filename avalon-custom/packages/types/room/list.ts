@@ -9,6 +9,7 @@ export type TRoomInfo = {
   aiTitle?: string;
   aiHumanCount?: number;
   aiBotCount?: number;
+  builtinBotCount?: number;
   aiOpenSeats?: number;
   aiBeginner?: boolean;
   aiBotDifficulty?: import('./index').AiBotDifficulty;

@@ -357,6 +357,46 @@ test('public AI list hides stopped rooms after merging live state over stale arc
   ]);
 });
 
+test('public AI list includes normal rooms with built-in bots and omits human-only rooms', async () => {
+  const ordinaryRoom = (roomID: string, roomBots: unknown[]) => ({
+    roomBots,
+    calculateRoomState: () => ({
+      roomID,
+      roomBots,
+      stage: 'created',
+      leaderID: 'host',
+      players: [{ id: 'host' }, ...roomBots],
+      options: {},
+      createAt: '2026-11-18T12:00:00.000Z',
+    }),
+  });
+  const host = {
+    dbManager: {},
+    rooms: {
+      builtin: ordinaryRoom('builtin', [{ id: 'bot', role: 'merlin' }]),
+      human: ordinaryRoom('human', []),
+    },
+    roomsList: [
+      { uuid: 'builtin', builtinBotCount: 3, createAt: '2026-11-18T12:00:00.000Z' },
+      { uuid: 'completed', builtinBotCount: 2, result: { winner: 'good' }, createAt: '2026-11-17T12:00:00.000Z' },
+      { uuid: 'removed', builtinBotCount: 2, result: { winner: 'evil' }, createAt: '2026-11-17T11:00:00.000Z' },
+    ],
+    isLobbyRoomRemoved: (id: string) => id === 'removed',
+  } as unknown as Manager;
+  const handlers: Record<string, (...args: any[]) => Promise<void>> = {};
+  new AiService(host).register({
+    on: (name: string, handler: any) => (handlers[name] = handler),
+  } as unknown as ServerSocket);
+  const response = jest.fn();
+  await handlers.getAiRoomsList(response);
+  const { rooms } = response.mock.calls[0][0];
+  expect(rooms).toMatchObject([
+    { uuid: 'builtin', ai: false, builtinBotCount: 1 },
+    { uuid: 'completed', builtinBotCount: 2 },
+  ]);
+  expect(rooms[0]).not.toHaveProperty('roomBots');
+});
+
 test('technical resume requires a current admin and rejects non-recoverable or stopped rooms', async () => {
   const { AiTechnicalPause, AiPause } = await import('./client');
   const io = { to: () => io, except: () => io, emit: () => true } as unknown as Server;

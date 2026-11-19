@@ -1,4 +1,3 @@
-import * as _ from 'lodash';
 
 import { IGameAddon, TAddonPriority } from '@/core/game/addons/interface';
 import { CheckLoyaltyAbstractAddon } from '@/core/game/addons/check-loyalty';
@@ -63,7 +62,7 @@ export class WitchAddon extends CheckLoyaltyAbstractAddon implements IGameAddon 
 
   moveToWitchLoyalty(): void {
     // Generate witch loyalty checker
-    const loyaltyChecker = _.sample(this.game.players.filter((player) => player.role.role !== 'witch'))!;
+    const loyaltyChecker = this.game.runtime.sample(this.game.players.filter((player) => player.role.role !== 'witch'))!;
 
     loyaltyChecker.features.witchLoyalty = 'active';
     loyaltyChecker.features.waitForAction = true;

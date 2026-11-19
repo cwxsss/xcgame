@@ -41,6 +41,7 @@
         <span v-else class="players-amount" :aria-label="`${game.players} ${$t('mainPage.players')}`">
           <span class="material-icons" aria-hidden="true">group</span>
           {{ game.state === 'created' && !game.result ? `${game.players}/10` : game.players }}
+          <span v-if="game.builtinBotCount">{{ $t('aiArena.playerCount', { count: game.builtinBotCount }) }}</span>
         </span>
         <OptionsPreview
           v-if="hasOptions"

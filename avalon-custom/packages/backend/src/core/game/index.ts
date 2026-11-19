@@ -32,6 +32,7 @@ import { generateRolesForGame } from '@/core/game/helpers';
 
 import { GameHooks, THookNames } from '@/core/game/hooks';
 import { GameTimer } from '@/core/game/timer';
+import { GameRuntime } from '@/core/game/runtime';
 
 export * from '@/core/game/interface';
 export * from '@/core/game/const';
@@ -133,6 +134,7 @@ export class Game extends GameHooks {
     preInit?: (game: Game) => void,
     selectedRole?: { userID: string; role: TRoles } | Array<{ userID: string; role: TRoles }>,
     readonly useLegacyAiAssassin = false,
+    readonly runtime = new GameRuntime(),
   ) {
     super();
 
@@ -177,7 +179,7 @@ export class Game extends GameHooks {
       const usedRoleIndexes = new Set<number>();
       for (const request of requestedRoles) {
         const playerIndex = userIDs.indexOf(request.userID);
-        const roleIndex = _.sample(
+        const roleIndex = this.runtime.sample(
           rolesInfo.characters.flatMap((character, index) =>
             character.role === request.role && !usedRoleIndexes.has(index) ? [index] : [],
           ),
@@ -214,7 +216,7 @@ export class Game extends GameHooks {
 
     this.players = playersWithNext;
 
-    this.leader = _.sample(playersWithNext)!;
+    this.leader = this.runtime.sample(playersWithNext)!;
     this.leader.features.waitForAction = true;
 
     let index = 1;
