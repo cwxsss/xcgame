@@ -176,6 +176,8 @@ export class BaseRoomState {
   public ai?: AiRoomState;
   // Response-only: archived games have no live room or voice conversation.
   public archived?: boolean;
+  // Response-only link to the next round, resolved independently of the saved result.
+  public nextRoomID?: string;
 
   @prop({ required: true })
   public stage!: 'created' | 'locked' | 'started';
@@ -191,6 +193,14 @@ export class BaseRoomState {
 
   @prop({ required: true, type: () => [RoomPlayer], _id: false })
   public players!: RoomPlayer[];
+
+  /**
+   * Physical seats around the waiting-room table.  Empty seats are null and
+   * occupied seats contain the player id.  This is intentionally optional so
+   * snapshots and clients from before selectable seating remain compatible.
+   */
+  @prop({ type: () => [String] })
+  public seats?: Array<string | null>;
 
   @prop({ _id: false })
   public vote?: VoteInRoom;

@@ -111,6 +111,12 @@ export function registerTabletopVoice(io, db) {
 
   const namespace = io.of(VOICE_NAMESPACE);
   const rooms = new Map();
+  // A recovery rotates board credentials while an old voice handshake may
+  // still be awaiting its database read. Keep a short-lived revocation marker
+  // so that both pending and already-connected old sockets are rejected.
+  const revokedCredentials = new Map();
+  const revokedKey = (gameName, matchID, playerID, credentials) =>
+    JSON.stringify([gameName, matchID, playerID, credentials]);
 
   const peersFor = (room, excludeSocketID) =>
     [...room.values()]
@@ -151,10 +157,17 @@ export function registerTabletopVoice(io, db) {
         return next(new Error('Unauthorized tabletop voice room'));
       }
 
+      if (
+        revokedCredentials.has(revokedKey(gameName, matchID, playerID, credentials))
+      ) {
+        return next(new Error('Tabletop voice seat was replaced'));
+      }
+
       socket.data.voice = {
         gameName,
         matchID,
         playerID,
+        credentials,
         name:
           typeof seat.name === 'string'
             ? seat.name.slice(0, MAX_NAME_LENGTH)
@@ -169,6 +182,12 @@ export function registerTabletopVoice(io, db) {
   namespace.on('connection', (socket) => {
     const identity = socket.data.voice;
     if (!identity) return socket.disconnect();
+    if (
+      revokedCredentials.has(
+        revokedKey(identity.gameName, identity.matchID, identity.playerID, identity.credentials),
+      )
+    )
+      return socket.disconnect();
     const key = roomKey(identity.gameName, identity.matchID);
     let room = rooms.get(key);
     if (!room) {
@@ -183,7 +202,11 @@ export function registerTabletopVoice(io, db) {
       return socket.disconnect();
     }
 
-    room.set(identity.playerID, { socket, name: identity.name });
+    room.set(identity.playerID, {
+      socket,
+      name: identity.name,
+      credentials: identity.credentials,
+    });
     previous?.socket.disconnect();
     socket.emit('voice-ice', getIceServers(socket.id));
     broadcastPeers(key);
@@ -240,9 +263,26 @@ export function registerTabletopVoice(io, db) {
 
   return {
     namespace,
+    disconnectPlayer(gameName, matchID, playerID, credentials) {
+      const key = roomKey(gameName, matchID);
+      const revoked = revokedKey(gameName, matchID, playerID, credentials);
+      clearTimeout(revokedCredentials.get(revoked));
+      revokedCredentials.set(
+        revoked,
+        setTimeout(() => revokedCredentials.delete(revoked), 15 * 60 * 1000).unref(),
+      );
+      const room = rooms.get(key);
+      const entry = room?.get(playerID);
+      if (!entry || entry.credentials !== credentials) return 0;
+      entry.socket.emit('voice-seat-replaced', { gameName, matchID, playerID });
+      entry.socket.disconnect();
+      return 1;
+    },
     close() {
       namespace.disconnectSockets();
       rooms.clear();
+      for (const timer of revokedCredentials.values()) clearTimeout(timer);
+      revokedCredentials.clear();
     },
   };
 }

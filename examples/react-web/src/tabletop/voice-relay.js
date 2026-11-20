@@ -1,6 +1,25 @@
 const SAMPLE_RATE = 8000;
 const FRAME_SIZE = 320;
 
+function decodeSample(value) {
+  const sample = value / 127.5 - 1;
+  return (Math.sign(sample) * Math.expm1(Math.abs(sample) * Math.log(256))) / 255;
+}
+
+// Activity detection stays local to the browser and does not change the relay
+// packet format. The threshold is deliberately conservative to ignore quiet
+// device noise while still exposing a useful speaking indicator.
+function frameIsActive(frame) {
+  if (!(frame instanceof ArrayBuffer) || frame.byteLength !== FRAME_SIZE) return false;
+  const samples = new Uint8Array(frame);
+  let energy = 0;
+  for (const value of samples) {
+    const sample = decodeSample(value);
+    energy += sample * sample;
+  }
+  return Math.sqrt(energy / samples.length) > 0.014;
+}
+
 function speechEncoder(inputRate, outputRate, frameSize, emit) {
   let frame = new Uint8Array(frameSize);
   let index = 0;
@@ -57,7 +76,7 @@ class TabletopSpeech extends AudioWorkletProcessor {
 registerProcessor('tabletop-speech', TabletopSpeech);
 `;
 
-export function createVoiceRelay(send) {
+export function createVoiceRelay(send, onLocalActivity, onRemoteActivity) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return null;
   const context = new AudioContext();
@@ -82,7 +101,10 @@ export function createVoiceRelay(send) {
         if (closed) return;
         capture = new AudioWorkletNode(context, 'tabletop-speech');
         capture.port.onmessage = ({ data }) => {
-          if (enabled) send(data);
+          if (enabled) {
+            onLocalActivity?.(frameIsActive(data));
+            send(data);
+          }
         };
         capture.port.postMessage(enabled);
       } catch {
@@ -93,12 +115,10 @@ export function createVoiceRelay(send) {
     }
     if (closed) return;
     if (!capture && typeof context.createScriptProcessor === 'function') {
-      legacyEncoder = speechEncoder(
-        context.sampleRate,
-        SAMPLE_RATE,
-        FRAME_SIZE,
-        send,
-      );
+      legacyEncoder = speechEncoder(context.sampleRate, SAMPLE_RATE, FRAME_SIZE, (frame) => {
+        onLocalActivity?.(frameIsActive(frame));
+        send(frame);
+      });
       capture = context.createScriptProcessor(1024, 1, 1);
       capture.onaudioprocess = ({ inputBuffer }) => {
         if (enabled) legacyEncoder.push(inputBuffer.getChannelData(0));
@@ -132,6 +152,7 @@ export function createVoiceRelay(send) {
   }
 
   function play(id, frame) {
+    onRemoteActivity?.(id, frameIsActive(frame));
     if (
       context.state !== 'running' ||
       !(frame instanceof ArrayBuffer) ||
@@ -143,12 +164,7 @@ export function createVoiceRelay(send) {
     if (previous > now + 0.4) return;
     const buffer = context.createBuffer(1, FRAME_SIZE, SAMPLE_RATE);
     const output = buffer.getChannelData(0);
-    new Uint8Array(frame).forEach((value, index) => {
-      const sample = value / 127.5 - 1;
-      output[index] =
-        (Math.sign(sample) * Math.expm1(Math.abs(sample) * Math.log(256))) /
-        255;
-    });
+    new Uint8Array(frame).forEach((value, index) => { output[index] = decodeSample(value); });
     const node = context.createBufferSource();
     node.buffer = buffer;
     node.connect(context.destination);
@@ -160,6 +176,25 @@ export function createVoiceRelay(send) {
   return {
     attach,
     play,
+    monitorLevel(stream, onActive) {
+      const input = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      const samples = new Uint8Array(analyser.fftSize);
+      input.connect(analyser);
+      const timer = window.setInterval(() => {
+        if (context.state !== 'running') return;
+        analyser.getByteTimeDomainData(samples);
+        let energy = 0;
+        for (const value of samples) energy += ((value - 128) / 128) ** 2;
+        if (Math.sqrt(energy / samples.length) > 0.025) onActive();
+      }, 100);
+      return () => {
+        window.clearInterval(timer);
+        input.disconnect();
+        analyser.disconnect();
+      };
+    },
     resume: () => context.resume(),
     remove: (id) => streams.delete(id),
     enable(value) {

@@ -118,6 +118,22 @@ test.each([
 ])('rejects invalid gameplay arguments for %s', (event, args) => {
   expect(validPacket(event, args)).toBe(false);
 });
+
+test('seat selection requires a bounded integer seat and acknowledgement', () => {
+  expect(validPacket('seatGame', ['room', 0, () => {}])).toBe(true);
+  expect(validPacket('seatGame', ['room', 9, () => {}])).toBe(true);
+  for (const index of [-1, 10, 1.5, '1', null, {}, []]) {
+    expect(validPacket('seatGame', ['room', index, () => {}])).toBe(false);
+  }
+  expect(validPacket('seatGame', ['room', 0])).toBe(false);
+});
+
+test('retryable room creation requires a request UUID and acknowledgement', () => {
+  const requestID = 'f5488784-79f1-4bfa-8ab8-d33f3da95ac1';
+  expect(validPacket('createRoomOnce', [requestID, () => {}])).toBe(true);
+  expect(validPacket('createRoomOnce', [requestID])).toBe(false);
+  expect(validPacket('createRoomOnce', ['another-room', () => {}])).toBe(false);
+});
 test.each([
   ['voteForMission', ['room', 'approve']],
   ['preVote', ['room', 'reject', 'card']],

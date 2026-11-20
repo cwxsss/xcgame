@@ -4,9 +4,13 @@
  */
 export default {
   room: {
-    errorNotFound: '這是錯誤的uuid',
+    errorNotFound: '找不到這個房間。',
+    connectionFailed: '暫時無法連線至房間。',
+    reconnect: '重新連線',
+    reconnecting: '正在重新連線至房間…',
     backToLobby: '返回大廳',
     restartGame: '重開遊戲',
+    goToNextGame: '前往新一局',
   },
   mainPage: {
     newPlayerTitle: '阿瓦隆是什麼桌遊？',

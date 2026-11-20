@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActionTimer } from './ActionTimer';
 import { COLORS, RESOURCES } from './splendor-data';
 import { eligibleNobles, paymentFor, totalTokens } from './splendor';
+import { rankSplendorScores } from './splendor-result';
 import './tabletop.css';
 import './splendor-mobile.css';
 import './splendor-desktop.css';
@@ -273,16 +274,7 @@ function ResultDialog({
 }) {
   const dialogRef = useRef(null);
   const winners = new Set((ctx.gameover?.winners ?? []).map(String));
-  const skipped = new Set(skippedPlayers.map(String));
-  const scores = [...(ctx.gameover?.scores ?? [])].sort((a, b) => {
-    const aSkipped = skipped.has(String(a.playerID));
-    const bSkipped = skipped.has(String(b.playerID));
-    return (
-      Number(aSkipped) - Number(bSkipped) ||
-      b.points - a.points ||
-      a.cards - b.cards
-    );
-  });
+  const scores = rankSplendorScores(ctx.gameover?.scores ?? [], skippedPlayers);
   useEffect(() => {
     dialogRef.current?.focus();
     const handleKeyDown = (event) => {
@@ -309,20 +301,10 @@ function ResultDialog({
           </div>
         </div>
         <div className="splendor-result-ranking">
-          {scores.map((score, index) => {
+          {scores.map((score) => {
             const champion = winners.has(String(score.playerID));
-            const isSkipped = skipped.has(String(score.playerID));
-            // Use competition ranking for equal scores. The first three
-            // players with the same points and card count are all rank 1,
-            // and the next player is rank 4.
-            const firstMatchingIndex = scores.findIndex(
-              (candidate, candidateIndex) =>
-                candidateIndex <= index &&
-                !skipped.has(String(candidate.playerID)) &&
-                candidate.points === score.points &&
-                candidate.cards === score.cards,
-            );
-            const rank = isSkipped ? '—' : firstMatchingIndex + 1;
+            const isSkipped = score.skipped;
+            const rank = score.rank;
             return (
               <div
                 className={`splendor-result-row${champion ? ' is-champion' : ''}${isSkipped ? ' is-skipped' : ''}`}

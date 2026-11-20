@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, extname, resolve, sep } from 'node:path';
@@ -13,6 +13,11 @@ import { Splendor } from './src/tabletop/splendor';
 import { chooseSplendorBotMove } from './src/tabletop/splendor-bots';
 import { registerTabletopVoice } from './tabletop-voice';
 import { registerTabletopAccess } from './tabletop-access';
+import { replayMatchID } from './tabletop-rematch';
+import {
+  consumeSeatRecovery,
+  issueSeatRecovery,
+} from './tabletop-seat-recovery';
 
 const isWaiting = (gameName, G) =>
   gameName === 'avalon' ? G.phase === 'waiting' : !G.started;
@@ -85,6 +90,27 @@ const games = [
 
 const roomCode = /^[A-Za-z0-9_-]{1,80}$/;
 const roomTimers = new Map();
+// Recovery codes are short-lived secrets. Keep only their digests in this
+// process so boardgame.io's public socket metadata can never expose them.
+const seatRecoveryRecords = new Map();
+
+function activeSeatRecoveryRecords(matchID, now = Date.now()) {
+  const records = seatRecoveryRecords.get(matchID);
+  if (!records) return {};
+  const active = Object.fromEntries(
+    Object.entries(records).filter(([, record]) => record?.expiresAt > now),
+  );
+  if (Object.keys(active).length) seatRecoveryRecords.set(matchID, active);
+  else seatRecoveryRecords.delete(matchID);
+  return active;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const matchID of seatRecoveryRecords.keys()) {
+    activeSeatRecoveryRecords(matchID, now);
+  }
+}, 60_000).unref();
 
 function runGameMove(gameName, matchID, state, { playerID, name, args = [] }) {
   const master = new Master(
@@ -217,7 +243,7 @@ class TabletopTransport extends SocketIO {
 
 const server = Server({
   games,
-  transport: new TabletopTransport(),
+  transport: new TabletopTransport({ notifyInvalidSeat: true }),
   origins: process.env.BOARDGAME_ORIGIN
     ? [process.env.BOARDGAME_ORIGIN]
     : [Origins.LOCALHOST],
@@ -226,7 +252,7 @@ const server = Server({
       credentials && seat?.credentials && credentials === seat.credentials,
     ),
 });
-registerTabletopVoice(server.transport.io, server.db);
+const tabletopVoiceService = registerTabletopVoice(server.transport.io, server.db);
 registerTabletopAccess(server);
 const webRoot = resolve(
   process.env.BOARDGAME_WEB_ROOT || resolve(__dirname, 'dist/tabletop'),
@@ -259,8 +285,7 @@ async function rematch(ctx, matchID) {
   }
   if (!state.ctx.gameover) ctx.throw(409);
 
-  const nextMatchID =
-    'replay-' + createHash('sha256').update(matchID).digest('hex');
+  const nextMatchID = replayMatchID(matchID);
   let { metadata: nextMatch } = await server.db.fetch(nextMatchID, {
     metadata: true,
   });
@@ -415,6 +440,94 @@ async function seatAvalon(ctx, matchID) {
   ctx.body = result ?? { ok: true };
 }
 
+async function createSplendorSeatRecovery(ctx, matchID) {
+  const { playerID, credentials } = ctx.request.body ?? {};
+  if (
+    typeof playerID !== 'string' ||
+    !/^\d+$/.test(playerID) ||
+    typeof credentials !== 'string' ||
+    credentials.length > 256
+  )
+    ctx.throw(400, 'playerID and credentials are invalid');
+
+  const { metadata, state } = await server.db.fetch(matchID, {
+    metadata: true,
+    state: true,
+  });
+  if (metadata?.gameName !== 'splendor' || !state) ctx.throw(404);
+  const player = metadata.players[playerID];
+  if (
+    !player?.name ||
+    !(await server.auth.authenticateCredentials({
+      playerID,
+      credentials,
+      metadata,
+    }))
+  )
+    ctx.throw(403, 'Invalid credentials');
+
+  const issued = issueSeatRecovery(
+    { ...metadata, _seatRecovery: activeSeatRecoveryRecords(matchID) },
+    playerID,
+    credentials,
+  );
+  if (!issued) ctx.throw(500, '无法生成回座码');
+  seatRecoveryRecords.set(matchID, issued.metadata._seatRecovery);
+  ctx.body = {
+    playerID,
+    recoveryCode: issued.recoveryCode,
+    expiresAt: issued.expiresAt,
+  };
+}
+
+async function recoverSplendorSeat(ctx, matchID) {
+  const { recoveryCode } = ctx.request.body ?? {};
+  if (typeof recoveryCode !== 'string' || recoveryCode.length > 64)
+    ctx.throw(400, 'recoveryCode is invalid');
+  const { metadata, state } = await server.db.fetch(matchID, {
+    metadata: true,
+    state: true,
+  });
+  if (metadata?.gameName !== 'splendor' || !state) ctx.throw(404);
+  const playerCredentials = await server.auth.generateCredentials(ctx);
+  const consumed = consumeSeatRecovery(
+    { ...metadata, _seatRecovery: activeSeatRecoveryRecords(matchID) },
+    recoveryCode,
+    playerCredentials,
+  );
+  if (!consumed) ctx.throw(403, '回座码无效或已过期');
+  const previousCredentials = metadata.players?.[consumed.playerID]?.credentials;
+  const { _seatRecovery, ...nextMetadata } = consumed.metadata;
+  await server.db.setMetadata(matchID, nextMetadata);
+  if (typeof previousCredentials === 'string') {
+    server.transport.revokePlayer(matchID, consumed.playerID, previousCredentials);
+    tabletopVoiceService.disconnectPlayer(
+      'splendor',
+      matchID,
+      consumed.playerID,
+      previousCredentials,
+    );
+  }
+  if (Object.keys(_seatRecovery).length) seatRecoveryRecords.set(matchID, _seatRecovery);
+  else seatRecoveryRecords.delete(matchID);
+  const updated = await server.db.fetch(matchID, {
+    metadata: true,
+    state: true,
+  });
+  server.transport.createTransportAPI(matchID).sendAll({
+    type: 'matchData',
+    args: [
+      matchID,
+      publicMatchData(matchID, updated.metadata ?? nextMetadata, updated.state)
+        .players,
+    ],
+  });
+  ctx.body = {
+    playerID: consumed.playerID,
+    playerCredentials,
+  };
+}
+
 server.app.use(async (ctx, next) => {
   let pathname;
   try {
@@ -460,6 +573,28 @@ server.app.use(async (ctx, next) => {
         server.transport
           .getMatchQueue(matchID)
           .add(() => seatAvalon(ctx, matchID)),
+      );
+    }
+    if (
+      ctx.method === 'POST' &&
+      gameName === 'splendor' &&
+      action === 'seat-recovery-code'
+    ) {
+      return parseRoomRequest(ctx, () =>
+        server.transport
+          .getMatchQueue(matchID)
+          .add(() => createSplendorSeatRecovery(ctx, matchID)),
+      );
+    }
+    if (
+      ctx.method === 'POST' &&
+      gameName === 'splendor' &&
+      action === 'recover-seat'
+    ) {
+      return parseRoomRequest(ctx, () =>
+        server.transport
+          .getMatchQueue(matchID)
+          .add(() => recoverSplendorSeat(ctx, matchID)),
       );
     }
     if (

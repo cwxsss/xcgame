@@ -64,6 +64,7 @@ export interface SocketOpts {
   socketOpts?: IOTypes.ServerOptions;
   socketAdapter?: any;
   pubSub?: GenericPubSub<IntermediateTransportData>;
+  notifyInvalidSeat?: boolean;
 }
 
 interface Client {
@@ -83,17 +84,52 @@ export class SocketIO {
   private readonly https: HttpsOptions;
   private readonly socketAdapter: any;
   private readonly socketOpts: IOTypes.ServerOptions;
+  private readonly notifyInvalidSeat: boolean;
   protected pubSub: GenericPubSub<IntermediateTransportData>;
   public server: http.Server | https.Server;
   public io: IOServer;
 
-  constructor({ https, socketAdapter, socketOpts, pubSub }: SocketOpts = {}) {
+  /**
+   * Revoke one player's currently connected socket after a credential rotation.
+   * The notification lets a client explain the disconnect before Socket.IO
+   * closes it, while the server-side credential check prevents old reconnects.
+   */
+  public revokePlayer(
+    matchID: string,
+    playerID: string,
+    credentials: string,
+  ): number {
+    let revoked = 0;
+    for (const client of this.clientInfo.values()) {
+      if (
+        client.matchID !== matchID ||
+        client.playerID !== playerID ||
+        client.credentials !== credentials
+      )
+        continue;
+      client.socket.emit('seat-replaced', { matchID, playerID });
+      if (typeof client.socket.disconnect === 'function') {
+        client.socket.disconnect();
+      }
+      revoked++;
+    }
+    return revoked;
+  }
+
+  constructor({
+    https,
+    socketAdapter,
+    socketOpts,
+    pubSub,
+    notifyInvalidSeat = false,
+  }: SocketOpts = {}) {
     this.clientInfo = new Map();
     this.roomInfo = new Map();
     this.perMatchQueue = new Map();
     this.https = https;
     this.socketAdapter = socketAdapter;
     this.socketOpts = socketOpts;
+    this.notifyInvalidSeat = notifyInvalidSeat;
     this.pubSub = pubSub || new InMemoryPubSub();
   }
 
@@ -221,6 +257,9 @@ export class SocketIO {
           await matchQueue.add(async () => {
             const syncResponse = await master.onSync(...args);
             if (syncResponse && syncResponse.error === 'unauthorized') {
+              if (this.notifyInvalidSeat) {
+                socket.emit('seat-unavailable', { matchID, playerID });
+              }
               return;
             }
             this.addClient(requestingClient, game);

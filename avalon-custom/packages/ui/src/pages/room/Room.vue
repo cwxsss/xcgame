@@ -1,13 +1,15 @@
 <template>
   <div class="room d-flex align-center justify-space-around">
     <span class="online">{{ $t('mainPage.online', { count: online }) }}</span>
-    <template v-if="errorMessage">
-      <h1 class="mb-4">{{ $t('room.' + errorMessage.error) }}</h1>
-      <LocaleLink :to="{ name: 'lobby' }"
-        ><v-btn size="x-large">{{ $t('room.backToLobby') }}</v-btn></LocaleLink
-      >
-    </template>
-    <template v-else-if="roomState">
+    <div v-if="errorMessage" class="room-connection-actions">
+      <h1>{{ $t(errorMessage.error === 'errorNotFound' ? 'room.errorNotFound' : 'room.connectionFailed') }}</h1>
+      <v-btn v-if="errorMessage.error !== 'errorNotFound'" :loading="loadingRoom" color="primary" @click="refreshRoom">
+        {{ $t('room.reconnect') }}
+      </v-btn>
+      <LocaleLink :to="{ name: 'lobby' }"><v-btn variant="text">{{ $t('room.backToLobby') }}</v-btn></LocaleLink>
+    </div>
+    <template v-else-if="roomState?.roomID === uuid">
+      <p v-if="loadingRoom" class="room-reconnecting" role="status">{{ $t('room.reconnecting') }}</p>
       <BeginnerTips
         v-if="
           tipsSession.available &&
@@ -52,15 +54,23 @@
       <Board
         :key="uuid"
         :room-state="roomState"
+        :room-sync-pending="loadingRoom"
         :spectator-roles="rolesShown ? spectatorRoles : {}"
         :spectator-decisions="rolesShown ? spectatorDecisions : []"
         @assassination-active="assassinationActive = $event"
+        @refresh-room="refreshRoom"
       >
         <template v-if="roomState.vote" v-slot:content>
           <RoomVote v-if="roomState.vote" :roomUuid="roomState.roomID" :vote="roomState.vote" />
         </template>
         <template v-slot:restart>
           <div class="d-flex flex-column align-center">
+            <v-btn
+              v-if="roomState.nextRoomID && stateManager.viewMode.value === 'live' && !assassinationActive"
+              :to="{ name: 'room', params: { uuid: roomState.nextRoomID } }"
+              color="primary"
+              class="restart-button"
+            >{{ $t('room.goToNextGame') }}</v-btn>
             <BotRematchButton
               v-if="
                 roomState.ai &&
@@ -185,7 +195,7 @@ export default defineComponent({
       type: String,
     },
   },
-  async setup(props) {
+  setup(props) {
     const voiceContext = shallowRef<ReturnType<typeof createRoomVoice>>();
     provide(roomVoiceKey, voiceContext);
     const stateManager = new GameStateManager();
@@ -194,6 +204,7 @@ export default defineComponent({
     const reviewBesideChat = computed(() => width.value >= 1280);
     const alert = ref<boolean>(true);
     const errorMessage = ref<ISocketError>();
+    const loadingRoom = ref(true);
     const store = useStore();
     const router = useRouter();
     const online = ref<number>();
@@ -282,38 +293,43 @@ export default defineComponent({
       (messages) => {
         if (roomState.value?.roomID === props.uuid) roomState.value.chat = messages;
       },
-    );
-    const initState = session.load;
-    onUnmounted(session.dispose);
-
-    await initState(props.uuid);
-
-    socket
-      .timeout(10000)
-      .emitWithAck('getOnlineCounter', props.uuid)
-      .then((counter) => {
-        if (typeof counter === 'number') online.value = counter;
-      })
-      .catch(() => {});
-
-    socket.on('gameUpdated', (game) => {
-      if (!session.isLoading() && game.uuid === props.uuid && roomState.value?.stage === 'started') {
+      (game) => {
+        if (roomState.value?.stage !== 'started' || roomState.value.archived) return;
         trackRoomAcquisition({ ...roomState.value, game }, userID.value, true);
         stateManager.mutateRoomState({ newGameState: game, userID: userID.value });
+      },
+      (loading) => {
+        loadingRoom.value = loading;
+      },
+    );
+    const initState = session.load;
+    const refreshRoom = () => initState(props.uuid);
+    onUnmounted(session.dispose);
+
+    const handleRestart = (uuid: string, previousRoomID?: string) => {
+      if (previousRoomID && previousRoomID !== props.uuid) return;
+      if (userID.value && roomState.value?.players.some((player) => player.id === userID.value)) {
+        void router.push({ name: 'room', params: { uuid } });
+      } else {
+        void refreshRoom();
       }
-    });
+    };
 
-    socket.on('restartGame', (uuid) => {
-      router.push({ name: 'room', params: { uuid } });
-    });
-
-    socket.on('roomOnlineUpdated', (counter) => {
+    const handleOnlineCount = (counter: number) => {
       online.value = counter;
+    };
+    socket.on('restartGame', handleRestart);
+    socket.on('roomOnlineUpdated', handleOnlineCount);
+    onUnmounted(() => {
+      socket.off('restartGame', handleRestart);
+      socket.off('roomOnlineUpdated', handleOnlineCount);
     });
 
     watch(
       () => props.uuid,
       (newUUID) => {
+        errorMessage.value = undefined;
+        online.value = undefined;
         initState(newUUID);
       },
     );
@@ -321,6 +337,8 @@ export default defineComponent({
     watch(userID, () => {
       initState(props.uuid);
     });
+
+    void refreshRoom();
 
     const displayHostPanel = computed(() => {
       return !roomState.value.ai && !roomState.value.archived && roomState.value.leaderID === userID.value;
@@ -374,6 +392,8 @@ export default defineComponent({
       chatOpen,
       roomState,
       errorMessage,
+      loadingRoom,
+      refreshRoom,
       displayRestartButton,
       displayHostPanel,
       visibleRoles,
@@ -397,6 +417,31 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.room-connection-actions {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.room-connection-actions h1 {
+  font-size: clamp(1rem, 4vw, 1.5rem);
+}
+.room-reconnecting {
+  position: fixed;
+  z-index: 13;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 2px 8px #0002;
+  font-size: 14px;
+  pointer-events: none;
+}
 .ai-room-status {
   position: fixed;
   top: 65px;

@@ -50,6 +50,7 @@ export interface GameRecoverySnapshot {
 }
 
 export class GameManager {
+  private revision = 0;
   game: Game;
   private ended = false;
   roomState!: TRoomState;
@@ -172,6 +173,7 @@ export class GameManager {
     if (!this.roomState || !this.game) {
       return;
     }
+    this.revision += 1;
 
     this.roomState.stage = this.game.stage;
 
@@ -262,6 +264,7 @@ export class GameManager {
    */
   prepareStateForUser(userID?: string): VisualGameState {
     return {
+      revision: this.revision,
       result: this.roomState.result,
       uuid: this.roomState.uuid,
       stage: this.roomState.stage,

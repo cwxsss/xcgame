@@ -40,7 +40,7 @@ function isCandidate(value) {
  * every other voice participant, so the component stays usable on the same
  * board-game server without an audio media server.
  */
-export function VoicePanel({ gameName, matchID, playerID, credentials }) {
+export function VoicePanel({ gameName, matchID, playerID, credentials, onSeatReplaced }) {
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionsRef = useRef(new Map());
@@ -55,12 +55,16 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   const relayRef = useRef(null);
   const joinAttemptRef = useRef(0);
   const joiningRef = useRef(false);
+  const connectedOnceRef = useRef(false);
   const launcherRef = useRef(null);
   const speakingRef = useRef(false);
   const talkPointerIdRef = useRef(null);
   const pendingTalkRef = useRef(false);
   const pendingToggleRef = useRef(false);
   const toastTimer = useRef(null);
+  const remoteActivityRef = useRef(new Map());
+  const remoteActivityTimerRef = useRef(null);
+  const remoteLevelMonitorsRef = useRef(new Map());
 
   const [joined, setJoined] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -70,6 +74,8 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   const [speaking, setSpeaking] = useState(false);
   const [peers, setPeers] = useState([]);
   const [remoteStreams, setRemoteStreams] = useState({});
+  const [localVoiceActive, setLocalVoiceActive] = useState(false);
+  const [remoteSpeakerCount, setRemoteSpeakerCount] = useState(0);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [toast, setToast] = useState('');
@@ -93,9 +99,63 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       });
     }
     setMicEnabled(enabled);
+    if (!enabled) setLocalVoiceActive(false);
   }, []);
 
+  const pruneRemoteActivity = useCallback(() => {
+    const now = Date.now();
+    for (const [peerId, timestamp] of remoteActivityRef.current.entries()) {
+      if (now - timestamp > 700) remoteActivityRef.current.delete(peerId);
+    }
+    setRemoteSpeakerCount(remoteActivityRef.current.size);
+    if (remoteActivityRef.current.size) {
+      remoteActivityTimerRef.current = window.setTimeout(pruneRemoteActivity, 220);
+    } else {
+      remoteActivityTimerRef.current = null;
+    }
+  }, []);
+
+  const markRemoteActivity = useCallback(
+    (peerId, active = true) => {
+      if (!peerId) return;
+      if (active) remoteActivityRef.current.set(peerId, Date.now());
+      else remoteActivityRef.current.delete(peerId);
+      setRemoteSpeakerCount(remoteActivityRef.current.size);
+      if (active && remoteActivityTimerRef.current === null) {
+        remoteActivityTimerRef.current = window.setTimeout(pruneRemoteActivity, 220);
+      }
+    },
+    [pruneRemoteActivity],
+  );
+
+  const stopRemoteLevelMonitor = useCallback((peerId) => {
+    const monitor = remoteLevelMonitorsRef.current.get(peerId);
+    if (!monitor) return;
+    monitor.stop();
+    remoteLevelMonitorsRef.current.delete(peerId);
+  }, []);
+
+  const startRemoteLevelMonitor = useCallback(
+    (peerId, stream) => {
+      if (!peerId || !stream?.getAudioTracks?.().length) return;
+      const existing = remoteLevelMonitorsRef.current.get(peerId);
+      if (existing?.stream === stream) return;
+      stopRemoteLevelMonitor(peerId);
+      const relay = relayRef.current;
+      if (!relay) return;
+      try {
+        const stop = relay.monitorLevel(stream, () => markRemoteActivity(peerId));
+        remoteLevelMonitorsRef.current.set(peerId, { stream, stop });
+      } catch (_error) {
+        // A relay frame can still report remote activity if the monitor fails.
+      }
+    },
+    [markRemoteActivity, stopRemoteLevelMonitor],
+  );
+
   const removePeer = useCallback((peerId, removeRoster = false) => {
+    stopRemoteLevelMonitor(peerId);
+    markRemoteActivity(peerId, false);
     relayRef.current?.remove(peerId);
     const record = peerConnectionsRef.current.get(peerId);
     if (record) {
@@ -116,7 +176,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     if (removeRoster) {
       setPeers((current) => current.filter((peer) => peer.id !== peerId));
     }
-  }, []);
+  }, [markRemoteActivity, stopRemoteLevelMonitor]);
 
   const emitSignal = useCallback((to, payload) => {
     const socket = socketRef.current;
@@ -170,6 +230,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
         const stream = event.streams?.[0] || new MediaStream([event.track]);
         if (!stream) return;
         remoteStreamsRef.current.set(peer.id, stream);
+        startRemoteLevelMonitor(peer.id, stream);
         setRemoteStreams((current) => ({ ...current, [peer.id]: stream }));
       };
 
@@ -197,7 +258,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
 
       return record;
     },
-    [emitSignal, removePeer],
+    [emitSignal, removePeer, startRemoteLevelMonitor],
   );
 
   const handleSignal = useCallback(
@@ -292,6 +353,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     joinAttemptRef.current++;
     joiningRef.current = false;
     joinedRef.current = false;
+    connectedOnceRef.current = false;
     setJoined(false);
     setConnectionState('idle');
     speakingRef.current = false;
@@ -300,6 +362,16 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     pendingToggleRef.current = false;
     setLocalAudioEnabled(false);
     setSpeaking(false);
+    setLocalVoiceActive(false);
+
+    if (remoteActivityTimerRef.current !== null) {
+      window.clearTimeout(remoteActivityTimerRef.current);
+      remoteActivityTimerRef.current = null;
+    }
+    remoteActivityRef.current.clear();
+    setRemoteSpeakerCount(0);
+    for (const peerId of remoteLevelMonitorsRef.current.keys())
+      stopRemoteLevelMonitor(peerId);
 
     for (const peerId of peerConnectionsRef.current.keys()) removePeer(peerId);
     const socket = socketRef.current;
@@ -319,7 +391,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     setPeers([]);
     setRemoteStreams({});
     setAudioBlocked(false);
-  }, [removePeer, setLocalAudioEnabled]);
+  }, [removePeer, setLocalAudioEnabled, stopRemoteLevelMonitor]);
 
   const join = useCallback(async () => {
     if (joinedRef.current || joiningRef.current) return;
@@ -343,17 +415,21 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     joiningRef.current = true;
     const attempt = ++joinAttemptRef.current;
     try {
-      const relay = createVoiceRelay((frame) => {
-        const socket = socketRef.current;
-        if (!socket?.connected || !micEnabledRef.current) return;
-        const targets = [...peerNamesRef.current.keys()].filter(
-          (id) =>
-            peerConnectionsRef.current.get(id)?.pc.connectionState !==
-            'connected',
-        );
-        if (targets.length)
-          socket.volatile.emit('voice-audio', { targets, frame });
-      });
+      const relay = createVoiceRelay(
+        (frame) => {
+          const socket = socketRef.current;
+          if (!socket?.connected || !micEnabledRef.current) return;
+          const targets = [...peerNamesRef.current.keys()].filter(
+            (id) =>
+              peerConnectionsRef.current.get(id)?.pc.connectionState !==
+              'connected',
+          );
+          if (targets.length)
+            socket.volatile.emit('voice-audio', { targets, frame });
+        },
+        (active) => setLocalVoiceActive(active),
+        (peerId, active) => markRemoteActivity(peerId, active),
+      );
       relayRef.current = relay;
       void relay?.resume().catch(() => setAudioBlocked(true));
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -392,6 +468,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
       socketRef.current = socket;
       let announced = false;
       socket.on('connect', () => {
+        connectedOnceRef.current = true;
         setConnectionState('connected');
         setErrorMessage('');
         if (!announced) {
@@ -420,7 +497,9 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
         if (reason === 'io server disconnect') {
           disconnect();
           setErrorMessage('语音席位已断开，可以重新加入。');
-        } else setConnectionState('connecting');
+        } else if (joinedRef.current) {
+          setConnectionState(connectedOnceRef.current ? 'reconnecting' : 'connecting');
+        }
       });
       socket.on('voice-error', ({ code }) => {
         if (code === 'ROOM_FULL') {
@@ -428,10 +507,15 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
           setErrorMessage('本房间的 5 个语音席位已满。');
         }
       });
+      socket.on('voice-seat-replaced', (seat) => {
+        if (seat.matchID !== matchID || seat.playerID !== playerID) return;
+        disconnect();
+        onSeatReplaced?.(matchID, playerID, credentials, true);
+      });
       socket.on('connect_error', (error) => {
         pendingTalkRef.current = false;
         pendingToggleRef.current = false;
-        setConnectionState('error');
+        setConnectionState(connectedOnceRef.current ? 'reconnecting' : 'error');
         setErrorMessage('语音服务暂时不可用，文字游戏不受影响。');
         if (error && error.message) console.warn('[voice]', error.message);
       });
@@ -470,7 +554,9 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
     handleRoster,
     handleSignal,
     matchID,
+    onSeatReplaced,
     playerID,
+    markRemoteActivity,
     removePeer,
     setLocalAudioEnabled,
     showVoiceToast,
@@ -596,11 +682,14 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   }, [collapsePanel, expanded]);
 
   useEffect(() => {
-    const stopForBackground = () => {
+    const stopForBackground = (event) => {
+      if (event.type === 'visibilitychange' && !document.hidden) return;
       // A tab switch, app switch, or screen lock must never leave an open
       // microphone behind. The player can explicitly turn it back on.
       speakingRef.current = false;
       talkPointerIdRef.current = null;
+      pendingTalkRef.current = false;
+      pendingToggleRef.current = false;
       setLocalAudioEnabled(false);
       setSpeaking(false);
     };
@@ -626,11 +715,33 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
   const connectionLabel =
     connectionState === 'connected'
       ? '已连接'
+      : connectionState === 'reconnecting'
+        ? '语音重连中'
       : connectionState === 'connecting'
         ? '连接中'
         : connectionState === 'error'
           ? '连接异常'
           : '未加入';
+  const voiceActivityLabel =
+    connectionState === 'reconnecting'
+      ? '语音重连中'
+      : connectionState === 'connecting'
+      ? '正在连接'
+      : connectionState === 'error'
+        ? '语音连接失败'
+        : !joined
+          ? '未加入'
+          : localVoiceActive
+            ? '你正在说话'
+            : remoteSpeakerCount > 0
+              ? `${remoteSpeakerCount} 人正在说话`
+              : mode === 'push'
+                ? speaking
+                  ? '按住中，未检测到声音'
+                  : '按住说话'
+                : micEnabled
+                  ? '已开麦，等待说话'
+                  : '已静音';
 
   return (
     <section
@@ -650,21 +761,7 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
                 aria-hidden="true"
               />
               <span>
-                {connectionState === 'connecting'
-                  ? '正在连接'
-                  : connectionState === 'error'
-                    ? '语音连接失败'
-                    : !joined
-                      ? '未加入'
-                      : connectionState === 'connecting'
-                        ? '连接中'
-                        : mode === 'push'
-                          ? speaking
-                            ? '正在说话'
-                            : '按住说话'
-                          : micEnabled
-                            ? '持续开麦'
-                            : '已静音'}
+                {voiceActivityLabel}
               </span>
             </div>
             <div
@@ -783,6 +880,10 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
               </button>
             </div>
           </div>
+          <p className="voice-activity-summary" role="status" aria-live="polite">
+            <span className={`voice-activity-dot ${localVoiceActive ? 'is-live' : ''}`} aria-hidden="true" />
+            {voiceActivityLabel}
+          </p>
 
           {!joined ? (
             <button
@@ -850,7 +951,13 @@ export function VoicePanel({ gameName, matchID, playerID, credentials }) {
 
               <div className="voice-peer-summary">
                 <span>语音成员 {peers.length + 1}/5</span>
-                {peers.length === 0 ? <span>等待其他玩家加入</span> : null}
+                {remoteSpeakerCount > 0 ? (
+                  <span className="voice-remote-speaking" role="status" aria-live="polite">
+                    {remoteSpeakerCount} 人正在说话
+                  </span>
+                ) : peers.length === 0 ? (
+                  <span>等待其他玩家加入</span>
+                ) : null}
               </div>
               {peers.length > 0 ? (
                 <ul className="voice-peer-list">

@@ -9,7 +9,8 @@
         <h1 id="lobby-title">{{ $t('mainPage.header') }}</h1>
         <p class="lobby-intro">{{ $t('mainPage.intro') }}</p>
         <div class="lobby-actions">
-          <v-btn class="create-room" color="primary" size="large" elevation="0" @click="createRoom">
+          <v-btn class="create-room" color="primary" size="large" elevation="0" :loading="creatingRoom"
+            :disabled="creatingRoom" @click="createRoom">
             <span class="material-icons" aria-hidden="true">add</span>
             {{ $t('mainPage.createRoom') }}
           </v-btn>
@@ -72,7 +73,7 @@
           </button>
         </div>
         <div v-else class="games-list">
-          <div v-for="game in visibleRooms.slice(0, visibleLimit)" :key="game.uuid" class="room-list-item">
+          <div v-for="game in displayedRooms" :key="game.uuid" class="room-list-item">
             <LobbyRoom :game="game" />
             <v-btn
               v-if="adminUnlocked"
@@ -88,7 +89,16 @@
               删除房间
             </v-btn>
           </div>
-          <button v-if="visibleRooms.length > visibleLimit" class="show-more" @click="visibleLimit += 8">
+          <nav v-if="filter === 'finished' && finishedPageCount > 1" class="finished-pages" :aria-label="$t('mainPage.filterfinished')">
+            <v-btn variant="outlined" size="small" :disabled="finishedPage <= 1" @click="finishedPage--">
+              {{ $t('mainPage.previousPage') }}
+            </v-btn>
+            <span aria-live="polite">{{ finishedPage }} / {{ finishedPageCount }}</span>
+            <v-btn variant="outlined" size="small" :disabled="finishedPage >= finishedPageCount" @click="finishedPage++">
+              {{ $t('mainPage.nextPage') }}
+            </v-btn>
+          </nav>
+          <button v-else-if="filter !== 'finished' && visibleRooms.length > visibleLimit" class="show-more" @click="visibleLimit += 8">
             {{ $t('mainPage.showMore') }} <span aria-hidden="true">↓</span>
           </button>
         </div>
@@ -210,6 +220,8 @@ export default defineComponent({
     const deleteDialog = ref(false);
     const roomToDelete = ref<string>();
     const deletingRoom = ref<string>();
+    const creatingRoom = ref(false);
+    let pendingCreate: { key: string; request: { id: string; expiresAt: number } } | undefined;
     let aiRefreshPending = false;
     const loadAiRooms = async () => {
       if (aiLoading.value) {
@@ -332,23 +344,48 @@ export default defineComponent({
     };
 
     const createRoom = async () => {
-      if (!store.state.profile) {
+      if (creatingRoom.value) return;
+      const userID = store.state.profile?.id;
+      if (!userID) {
         eventBus.emit('openAuthModal', createRoom);
         return;
       }
 
+      creatingRoom.value = true;
       try {
-        const result = await socket.timeout(10000).emitWithAck('createRoom');
+        const key = `avalon-pending-room:${userID}`;
+        let pending = pendingCreate?.key === key ? pendingCreate.request : undefined;
+        if (!pending) {
+          try {
+            pending = JSON.parse(sessionStorage.getItem(key) || 'null') ?? undefined;
+          } catch {
+            // The in-memory request also survives retries without web storage.
+          }
+        }
+        if (typeof pending?.id !== 'string' || typeof pending.expiresAt !== 'number' || pending.expiresAt <= Date.now()) {
+          pending = { id: crypto.randomUUID(), expiresAt: Date.now() + 10 * 60000 };
+          try { sessionStorage.setItem(key, JSON.stringify(pending)); } catch { /* Optional storage. */ }
+        }
+        pendingCreate = { key, request: pending };
+        const clearPendingCreate = () => {
+          pendingCreate = undefined;
+          try { sessionStorage.removeItem(key); } catch { /* Optional storage. */ }
+        };
+        const result = await socket.timeout(10000).emitWithAck('createRoomOnce', pending.id);
         if (typeof result !== 'string') {
-          eventBus.emit('infoMessage', t('errors.' + result.error));
+          if (result.error === 'errorNotFound' || result.error === 'invalidRequest') clearPendingCreate();
+          eventBus.emit('infoMessage', t(result.error === 'errorNotFound' ? 'room.errorNotFound' : 'errors.' + result.error));
           return;
         }
         // Keep the room creation flow in one place: the owner lands in the
         // pre-game options sheet where custom rules and optional bot seats can
         // be configured before inviting friends or locking the table.
         await router.push({ name: 'room', params: { uuid: result }, query: { configure: '1' } });
+        if (router.currentRoute.value.params.uuid === result) clearPendingCreate();
       } catch {
         eventBus.emit('infoMessage', t('errors.requestFailed'));
+      } finally {
+        creatingRoom.value = false;
       }
     };
 
@@ -360,8 +397,11 @@ export default defineComponent({
 
     const filter = ref('all');
     const visibleLimit = ref(8);
+    const finishedPage = ref(1);
+    const finishedPageSize = 8;
     watch(filter, () => {
       visibleLimit.value = filter.value === 'ai-games' ? 20 : 8;
+      finishedPage.value = 1;
       if (filter.value === 'ai-games') void loadAiRooms();
     });
     const filters = ['all', 'open', 'playing', 'finished', 'ai-games'];
@@ -390,6 +430,15 @@ export default defineComponent({
       value === 'ai-games'
         ? aiRooms.value?.length || 0
         : (roomsList.value || []).filter((room) => value === 'all' || roomCategory(room) === value).length;
+    const finishedPageCount = computed(() => Math.max(1, Math.ceil(filterCount('finished') / finishedPageSize)));
+    watch(finishedPageCount, (pages) => {
+      finishedPage.value = Math.min(finishedPage.value, pages);
+    });
+    const displayedRooms = computed(() => {
+      if (filter.value !== 'finished') return visibleRooms.value.slice(0, visibleLimit.value);
+      const offset = (finishedPage.value - 1) * finishedPageSize;
+      return visibleRooms.value.slice(offset, offset + finishedPageSize);
+    });
 
     const updateOnline = (counter: number) => {
       online.value = counter;
@@ -430,6 +479,7 @@ export default defineComponent({
 
     return {
       createRoom,
+      creatingRoom,
       aiRooms,
       aiLoading,
       aiError,
@@ -438,6 +488,9 @@ export default defineComponent({
       visibleLimit,
       filters,
       visibleRooms,
+      displayedRooms,
+      finishedPage,
+      finishedPageCount,
       filterCount,
       online,
       roomsList,
@@ -461,6 +514,14 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.finished-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .lobby-guide {
   margin-top: 32px;
   border: 1px solid rgba(var(--v-theme-text-primary), 0.1);

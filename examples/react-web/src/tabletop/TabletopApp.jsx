@@ -50,7 +50,7 @@ const clients = Object.fromEntries(
         }, [onWaitingChange, waiting]);
         return <Board {...props} />;
       },
-      multiplayer: SocketIO(),
+      multiplayer: SocketIO(key === 'splendor' ? { onSeatLost: announceSeatLost } : undefined),
       loading: () => (
         <p className="tt-notice" role="status">
           正在连接房间…
@@ -100,14 +100,22 @@ function saveSeat(room, { playerID, playerCredentials }) {
   return seat;
 }
 
-function clearSeat(room) {
+function clearSeat(room, expectedCredentials) {
   const key = seatKey(room);
-  seats.delete(key);
+  if (!expectedCredentials || seats.get(key)?.credentials === expectedCredentials) seats.delete(key);
   try {
-    localStorage.removeItem(key);
+    if (!expectedCredentials || JSON.parse(localStorage.getItem(key))?.credentials === expectedCredentials) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // Storage can be unavailable in a private browsing context.
   }
+}
+
+function announceSeatLost(matchID, playerID, credentials, replaced) {
+  window.dispatchEvent(new CustomEvent('tabletop-seat-revoked', {
+    detail: { matchID, playerID, credentials, replaced },
+  }));
 }
 
 function AvalonSeatChoices({
@@ -478,12 +486,53 @@ function Room({ room }) {
   const [startingWithAI, setStartingWithAI] = useState(false);
   const [rematchBusy, setRematchBusy] = useState(false);
   const [rematchError, setRematchError] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recoveryStatus, setRecoveryStatus] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [issuedRecovery, setIssuedRecovery] = useState(null);
+  const [recoverySeconds, setRecoverySeconds] = useState(0);
   const game = games[room.game];
   const GameClient = clients[room.game];
   const isAvalon = room.game === 'avalon';
   const seatingOpen = isAvalon && info?.seatingOpen;
   const canChangeSeat = seatingOpen && waiting && seat && seat.playerID !== '0';
   const inviteUrl = new URL(roomHash(room), window.location.origin).href;
+
+  useEffect(() => {
+    const handleSeatRevoked = (event) => {
+      const detail = event.detail;
+      if (
+        room.game !== 'splendor' || !seat || detail?.matchID !== room.matchID ||
+        detail.playerID !== seat.playerID || detail.credentials !== seat.credentials
+      ) return;
+      clearSeat(room, seat.credentials);
+      setSeat(null);
+      setWaiting(false);
+      setIssuedRecovery(null);
+      setRecoveryCode('');
+      setRecoverySeconds(0);
+      setRecoveryStatus('');
+      setError(detail.replaced
+        ? '这个座位已在另一台设备恢复，当前设备已退出座位。'
+        : '当前设备的座位凭证已失效。可以用新的回座码恢复座位。');
+    };
+    window.addEventListener('tabletop-seat-revoked', handleSeatRevoked);
+    return () => window.removeEventListener('tabletop-seat-revoked', handleSeatRevoked);
+  }, [room, seat]);
+
+  useEffect(() => {
+    if (!issuedRecovery?.expiresAt) {
+      setRecoverySeconds(0);
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((issuedRecovery.expiresAt - Date.now()) / 1000));
+      setRecoverySeconds(remaining);
+      if (!remaining) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [issuedRecovery]);
 
   useEffect(() => {
     let active = true;
@@ -612,6 +661,45 @@ function Room({ room }) {
     }
   }
 
+  async function issueRecoveryCode() {
+    if (recoveryBusy || !seat || room.game !== 'splendor') return;
+    setRecoveryBusy(true);
+    setRecoveryError('');
+    setRecoveryStatus('');
+    try {
+      const result = await request(`${roomPath(room)}/seat-recovery-code`, {
+        playerID: seat.playerID,
+        credentials: seat.credentials,
+      });
+      setIssuedRecovery(result);
+      setRecoverySeconds(Math.max(0, Math.ceil((result.expiresAt - Date.now()) / 1000)));
+    } catch (cause) {
+      setRecoveryError(cause.message);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
+  async function recoverSeat(event) {
+    event.preventDefault();
+    const code = recoveryCode.trim();
+    if (recoveryBusy || !code) return;
+    setRecoveryBusy(true);
+    setRecoveryError('');
+    try {
+      const result = await request(`${roomPath(room)}/recover-seat`, {
+        recoveryCode: code,
+      });
+      setSeat(saveSeat(room, result));
+      setRecoveryCode('');
+      setRetry((value) => value + 1);
+    } catch (cause) {
+      setRecoveryError(cause.message);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
   return (
     <>
       <section className="tt-room-header">
@@ -695,6 +783,68 @@ function Room({ room }) {
       {info &&
         (seat ? (
           <>
+            {room.game === 'splendor' && (
+              <details className="tt-panel tt-seat-recovery">
+                <summary>换设备回座</summary>
+                <p>
+                  在当前设备生成一次性回座码，再到新设备输入。回座码 10
+                  分钟内有效，使用后立即失效。
+                </p>
+                <button
+                  hidden={Boolean(issuedRecovery)}
+                  type="button"
+                  className="tt-button tt-secondary"
+                  disabled={recoveryBusy}
+                  onClick={issueRecoveryCode}
+                >
+                  {recoveryBusy ? '正在生成…' : '生成一次性回座码'}
+                </button>
+                {issuedRecovery && (
+                  <div className="tt-seat-recovery-code" role="status">
+                    <strong>{issuedRecovery.recoveryCode}</strong>
+                    <span>
+                      请只发给要接管此座位的人，使用后当前设备会退出该座位。
+                      {recoverySeconds > 0
+                        ? ` 有效期还剩 ${Math.floor(recoverySeconds / 60)}:${String(recoverySeconds % 60).padStart(2, '0')}。`
+                        : ' 回座码已过期，请重新生成。'}
+                    </span>
+                    <div className="tt-seat-recovery-actions">
+                      <button
+                        type="button"
+                        className="tt-button tt-secondary"
+                        disabled={recoveryBusy || recoverySeconds === 0}
+                        onClick={async () => {
+                          setRecoveryError('');
+                          setRecoveryStatus('');
+                          try {
+                            await navigator.clipboard.writeText(issuedRecovery.recoveryCode);
+                            setRecoveryStatus('回座码已复制。');
+                          } catch {
+                            setRecoveryError('复制失败，请长按回座码手动复制。');
+                          }
+                        }}
+                      >
+                        复制回座码
+                      </button>
+                      <button
+                        type="button"
+                        className="tt-button tt-secondary"
+                        disabled={recoveryBusy}
+                        onClick={issueRecoveryCode}
+                      >
+                        {recoveryBusy ? '正在生成…' : '重新生成'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {recoveryStatus && <p role="status">{recoveryStatus}</p>}
+                {recoveryError && (
+                  <p className="tt-notice tt-error" role="alert">
+                    {recoveryError}
+                  </p>
+                )}
+              </details>
+            )}
             {canChangeSeat && (
               <details className="tt-panel tt-avalon-seat-controls">
                 <summary>换座或离座</summary>
@@ -731,45 +881,94 @@ function Room({ room }) {
               key={`voice:${seat.playerID}`}
               gameName={room.game}
               matchID={room.matchID}
+              onSeatReplaced={room.game === 'splendor' ? announceSeatLost : undefined}
               {...seat}
             />
           </>
         ) : (
-          <form className="tt-panel tt-join" onSubmit={join}>
-            <h2>在这张桌上入座</h2>
-            <p>{info.players.length} 人房间</p>
-            {isAvalon &&
-              (seatingOpen ? (
-                <AvalonSeatChoices
-                  players={info.players}
-                  selectedID={selectedSeat}
-                  disabled={busy}
-                  onSelect={setSelectedSeat}
+          <>
+            <form className="tt-panel tt-join" onSubmit={join}>
+              <h2>在这张桌上入座</h2>
+              <p>{info.players.length} 人房间</p>
+              {isAvalon &&
+                (seatingOpen ? (
+                  <AvalonSeatChoices
+                    players={info.players}
+                    selectedID={selectedSeat}
+                    disabled={busy}
+                    onSelect={setSelectedSeat}
+                  />
+                ) : (
+                  <p>当前房间已停止入座。</p>
+                ))}
+              <label>
+                你的昵称
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="请输入昵称"
+                  autoComplete="nickname"
+                  maxLength={20}
+                  required
                 />
-              ) : (
-                <p>当前房间已停止入座。</p>
-              ))}
-            <label>
-              你的昵称
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="请输入昵称"
-                autoComplete="nickname"
-                maxLength={20}
-                required
-              />
-            </label>
-            <button
-              className="tt-button tt-primary"
-              disabled={
-                busy || (isAvalon && (!seatingOpen || selectedSeat === null))
-              }
-              type="submit"
-            >
-              {busy ? '正在加入…' : '加入房间'}
-            </button>
-          </form>
+              </label>
+              <button
+                className="tt-button tt-primary"
+                disabled={
+                  busy || (isAvalon && (!seatingOpen || selectedSeat === null))
+                }
+                type="submit"
+              >
+                {busy ? '正在加入…' : '加入房间'}
+              </button>
+            </form>
+            {room.game === 'splendor' && (
+              <form className="tt-panel tt-seat-recovery tt-join-recovery" onSubmit={recoverSeat}>
+                <h2>已有宝石商人座位？</h2>
+                <p>输入当前设备生成的一次性回座码，恢复原来的座位与游戏进度。</p>
+                <label>
+                  一次性回座码
+                  <input
+                    value={recoveryCode}
+                    onChange={(event) => setRecoveryCode(event.target.value.toUpperCase())}
+                    placeholder="输入 10 位回座码"
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    maxLength={10}
+                    pattern="[A-Fa-f0-9]{10}"
+                    required
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="tt-button tt-secondary"
+                  disabled={recoveryBusy}
+                  onClick={async () => {
+                    try {
+                      const pasted = await navigator.clipboard.readText();
+                      if (pasted) setRecoveryCode(pasted.trim().toUpperCase().slice(0, 10));
+                    } catch {
+                      setRecoveryError('无法读取剪贴板，请手动输入回座码。');
+                    }
+                  }}
+                >
+                  从剪贴板粘贴
+                </button>
+                <button
+                  type="submit"
+                  className="tt-button tt-secondary"
+                  disabled={recoveryBusy || recoveryCode.trim().length !== 10}
+                >
+                  {recoveryBusy ? '正在恢复…' : '恢复我的座位'}
+                </button>
+                {recoveryError && (
+                  <p className="tt-notice tt-error" role="alert">
+                    {recoveryError}
+                  </p>
+                )}
+              </form>
+            )}
+          </>
         ))}
     </>
   );

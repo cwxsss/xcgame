@@ -28,6 +28,8 @@ export function registerTabletopAccess(server) {
   const trustedProxyPrefix = process.env.TABLETOP_ACCESS_PROXY_PREFIX;
   const failures = new Map();
   const parse = bodyParser({ enableTypes: ['json'], jsonLimit: '1kb' });
+  const avalonPath = process.env.TABLETOP_AVALON_PATH === '/avalon/' ? '/avalon/' : undefined;
+  const granted = { allowed: true, ...(avalonPath ? { avalonPath } : {}) };
 
   function signature(expires) {
     return createHmac('sha256', signingKey).update(expires).digest();
@@ -99,14 +101,14 @@ export function registerTabletopAccess(server) {
       const allowed = validCookie(ctx.req);
       if (ctx.method === 'GET') {
         if (allowed) sendCookie(ctx);
-        ctx.body = { allowed };
+        ctx.body = allowed ? granted : { allowed: false };
         return;
       }
       if (ctx.method !== 'POST') ctx.throw(405);
       if (origin && ctx.get('Origin') && ctx.get('Origin') !== origin)
         ctx.throw(403);
       if (allowed) {
-        ctx.body = { allowed: true };
+        ctx.body = granted;
         return;
       }
       const ip = address(ctx.req);
@@ -133,7 +135,7 @@ export function registerTabletopAccess(server) {
         ) {
           failures.delete(ip);
           sendCookie(ctx);
-          ctx.body = { allowed: true };
+          ctx.body = granted;
           return;
         }
         const now = Date.now();

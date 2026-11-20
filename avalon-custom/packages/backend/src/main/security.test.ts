@@ -5,6 +5,80 @@ import type { DBManager } from '@/db';
 import { BotRoom } from '@/ai/room';
 import { Room } from '@/room';
 
+test('retries of one create-room request return one room while a new request creates another', async () => {
+  const { manager, handlers } = fixture(true);
+  const reply = jest.fn();
+  const first = 'f5488784-79f1-4bfa-8ab8-d33f3da95ac1';
+  const second = 'b56ea878-6154-44ba-b705-3502878af211';
+  await Promise.all([handlers.createRoomOnce(first, reply), handlers.createRoomOnce(first, reply)]);
+  const [roomID] = reply.mock.calls[0];
+  expect(reply.mock.calls).toEqual([[roomID], [roomID]]);
+  expect(Object.keys(manager.rooms)).toEqual([roomID]);
+  await handlers.createRoomOnce(second, reply);
+  expect(reply.mock.lastCall![0]).not.toBe(roomID);
+  expect(Object.keys(manager.rooms)).toHaveLength(2);
+});
+
+test('a rematch keeps the exact seat map and the finished archive links to the successor', async () => {
+  const { manager, handlers } = fixture(true);
+  manager.createRoom('old-game', 'alice', ['alice', 'bob']);
+  const original = manager.rooms['old-game'];
+  original.seatGame('alice', 8);
+  original.seatGame('bob', 6);
+  original.setRoomBots([{}, {}, {}]);
+  const seats = original.getSeatAssignments();
+  original.startGame();
+  if (original.data.stage !== 'started') throw Error('Expected started game');
+  original.data.manager.game.endGame('manualy');
+  const archive = original.calculateRoomState() as StartedRoomState;
+  handlers.restartGame('old-game');
+
+  const nextRoomID = original.nextRoomID!;
+  expect(manager.rooms[nextRoomID].getSeatAssignments()).toEqual(seats);
+  expect(manager.rooms[nextRoomID].roomBots).toEqual(original.roomBots);
+  const live = jest.fn();
+  await handlers.joinRoom('old-game', live);
+  expect(live).toHaveBeenCalledWith(expect.objectContaining({ nextRoomID }));
+
+  const savedNextRoom = manager.rooms[nextRoomID];
+  delete manager.rooms['old-game'];
+  delete manager.rooms[nextRoomID];
+  manager.dbManager.getRoomFromDB = jest.fn(async (id) => id === 'old-game' ? archive : null);
+  manager.dbManager.getWaitingRoomSnapshot = jest.fn(async (id) => id === nextRoomID ? ({
+    roomID: nextRoomID,
+    expiresAt: new Date(Date.now() + 10000),
+  } as Awaited<ReturnType<DBManager['getWaitingRoomSnapshot']>>) : null);
+  const late = jest.fn();
+  await handlers.joinRoom('old-game', late);
+  expect(late).toHaveBeenCalledWith(expect.objectContaining({ archived: true, nextRoomID }));
+  expect(savedNextRoom.data.stage).toBe('created');
+});
+
+test('seat commands acknowledge occupied, locked and released seats', () => {
+  const { manager, handlers } = fixture(true);
+  const result = jest.fn();
+  manager.createRoom('open', 'bob', ['bob', 'alice']);
+  handlers.seatGame('open', 0, result);
+  expect(result).toHaveBeenLastCalledWith({ error: 'seatOccupied' });
+  handlers.leaveGame('open', result);
+  expect(result).toHaveBeenLastCalledWith(true);
+  expect(manager.rooms.open.seats[1]).toBeNull();
+
+  manager.rooms.open.toggleLockedState();
+  handlers.seatGame('open', 1, result);
+  expect(result).toHaveBeenLastCalledWith({ error: 'seatLocked' });
+  manager.rooms.open.toggleLockedState();
+  handlers.joinGame('open', result);
+  expect(result).toHaveBeenLastCalledWith(true);
+  expect(manager.rooms.open.seats[1]).toBe('alice');
+
+  manager.createRoom('started', 'bob', ['bob', 'alice', 'carol', 'dave', 'eve']);
+  manager.rooms.started.startGame();
+  handlers.leaveGame('started', result);
+  expect(result).toHaveBeenLastCalledWith({ error: 'seatStarted' });
+  expect(manager.rooms.started.players).toContain('alice');
+});
+
 test.each(['created', 'locked', 'started'] as const)('host can transfer ownership in a %s room', (stage) => {
   const { manager, handlers, broadcasts } = fixture(true);
   manager.createRoom('table', 'alice', ['alice', 'bob', 'carol', 'dave', 'eve']);
@@ -226,6 +300,80 @@ test('guest cannot subscribe arrays or private channel names; valid archives use
   expect([...socket.rooms]).toEqual(['socket']);
   await handlers.joinRoom('archive', () => {});
   expect([...socket.rooms]).toEqual(['socket', 'room:archive']);
+});
+
+test('room snapshots retry in the background even while everyone is idle', async () => {
+  const { manager } = fixture(true);
+  const save = jest.fn().mockRejectedValueOnce(Error('temporary Mongo failure')).mockResolvedValue(undefined);
+  manager.dbManager.saveWaitingRoomSnapshot = save;
+  const warn = jest.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    manager.createRoom('retry-room', 'alice', ['alice']);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(save).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(2_000);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1][0].roomID).toBe('retry-room');
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(save).toHaveBeenCalledTimes(2);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test('recent finished entries cannot push an older playable room out of the lobby', async () => {
+  const { manager, handlers } = fixture(true);
+  manager.createRoom('older-open', 'alice', ['alice']);
+  const active = manager.roomsList[0];
+  manager.roomsList = [
+    ...Array.from({ length: 51 }, (_, i) => ({
+      ...active, uuid: `finished-${i}`, state: 'started' as const, result: { reason: 'manualy' as const },
+    })),
+    active,
+  ];
+  const reply = jest.fn();
+  await handlers.getRoomsList(reply);
+  const rooms = reply.mock.calls[0][0];
+  expect(rooms[0].uuid).toBe('older-open');
+  expect(rooms.filter((room: { result?: unknown }) => Boolean(room.result))).toHaveLength(50);
+});
+
+test('planned shutdown holds the last live checkpoint, suspends the timer and rejects new game operations', async () => {
+  const { manager, handlers } = fixture(true);
+  manager.createRoom('saved-before-stop', 'alice', ['alice', 'bob', 'carol', 'dave', 'eve'], {
+    roles: {},
+    addons: {},
+    features: { timerDurations: { firstSelectTeam: { enabled: true, duration: 10 } } },
+  });
+  const room = manager.rooms['saved-before-stop'];
+  room.toggleLockedState();
+  handlers.startGame(room.roomID);
+  if (room.data.stage !== 'started') throw Error('Expected a started room');
+  const game = room.data.manager.game;
+  const timer = game.timer.recoveryState();
+  expect(timer.current?.stage).toBe('firstSelectTeam');
+
+  let notifySave!: () => void;
+  let finishSave!: () => void;
+  const saving = new Promise<void>((resolve) => { notifySave = resolve; });
+  const stored = new Promise<void>((resolve) => { finishSave = resolve; });
+  manager.dbManager.saveStartedRoomSnapshot = jest.fn(() => {
+    notifySave();
+    return stored;
+  });
+  const complete = jest.fn();
+  const stop = manager.saveBeforeShutdown().then(complete);
+  const reply = jest.fn();
+  await handlers.createRoom(reply);
+  expect(reply).toHaveBeenCalledWith({ error: 'serverRestarting' });
+  await saving;
+  await jest.advanceTimersByTimeAsync(11_000);
+  expect(game.timer.recoveryState()).toEqual(timer);
+  expect(game.stage).toBe('selectTeam');
+  expect(complete).not.toHaveBeenCalled();
+  finishSave();
+  await stop;
+  expect(complete).toHaveBeenCalledTimes(1);
 });
 
 test('room administration is socket scoped and removes only the selected lobby room', async () => {

@@ -31,7 +31,12 @@
                 />
               </div>
               <div class="button-panel d-flex flex-column align-center">
-                <StartPanel :room-state="roomState" />
+                <StartPanel
+                  :room-state="roomState"
+                  :seat-action="seatAction"
+                  :seat-disabled="seatDisabled"
+                  @change-seat="changeSeat"
+                />
               </div>
             </template>
             <template v-else>
@@ -54,54 +59,69 @@
         </slot>
         <div
           class="player-container"
-          v-for="(player, i) in players"
+          v-for="(seat, i) in boardSeats"
           :inert="roleDeal ? true : undefined"
-          :style="{ transform: calculateRotate(i) }"
-          :key="player.id"
+          :style="{ transform: calculateRotate(i, false, boardSeats.length) }"
+          :key="seat.index"
         >
-          <div
-            v-if="
-              roomState.ai?.publicBotGame &&
-              roomState.ai.withFriend &&
-              roomState.ai.status === 'ready' &&
-              i >= players.length - (roomState.ai.humanSeats ?? 2) &&
-              i < players.length - (roomState.ai.humanPlayerIDs?.length ?? 1)
-            "
-            class="friend-seat"
-            :style="{ transform: calculateRotate(i, true), translate: '0 -50%' }"
-            role="status"
+          <button
+            v-if="!seat.player"
+            type="button"
+            class="open-seat"
+            :disabled="seatDisabled || (roomState.stage !== 'created' && !(roomState.stage === 'locked' && isUserInGame))"
+            :aria-busy="seatAction === seat.index"
+            :aria-label="seatLabel(seat.index)"
+            :title="seatLabel(seat.index)"
+            @click="onSeatClick(seat.index)"
           >
-            <span class="friend-seat-avatar" aria-hidden="true"></span>
-            <span class="friend-seat-label">{{ $t('aiArena.setupEmptySeat') }}</span>
-          </div>
-          <Player
-            v-else
-            :data-player-id="player.id"
-            :player-state="player"
-            :loyalty-badge="loyaltyBadges[player.id]"
-            :badge-hidden="activeLoyaltyTarget === player.id"
-            :thinking="thinkingPlayerIDs.includes(player.id)"
-            :discussion-turn="discussionPlayerID === player.id"
-            :action-timer="playerActionTimer(player.id)"
-            :manual-timer="
-              stateManager.viewMode.value === 'live' && gameTimer?.isCustom && gameTimer.playerID === player.id
-                ? gameTimer
-                : undefined
-            "
-            :voice-side="Math.sin((2 * Math.PI * i) / players.length + Math.PI) > 0.75 ? 'left' : 'right'"
-            :private-decision="
-              roomState.ai && !playerInGame && spectatorRoles[player.id]
-                ? spectatorDecisions.find((d) => d.playerID === player.id)
-                : undefined
-            "
-            :spectator-role="roomState.ai && !playerInGame ? spectatorRoles[player.id] : undefined"
-            :display-kick="canKickPlayer(player.id)"
-            :display-index="roomState.stage === 'started' ? gameState.features.displayIndex : false"
-            :visible-history="visibleHistory"
-            :current-stage="roomState.stage === 'started' ? gameState.stage : undefined"
-            :style="{ transform: calculateRotate(i, true), translate: '0 -50%' }"
-            @player-click="onPlayerClick"
-          />
+            <span class="open-seat-avatar" aria-hidden="true"><span>+</span></span>
+            <span class="open-seat-label">{{ seatLabel(seat.index) }}</span>
+          </button>
+          <template v-else>
+            <div
+              v-if="
+                roomState.ai?.publicBotGame &&
+                roomState.ai.withFriend &&
+                roomState.ai.status === 'ready' &&
+                i >= boardSeats.length - (roomState.ai.humanSeats ?? 2) &&
+                i < boardSeats.length - (roomState.ai.humanPlayerIDs?.length ?? 1)
+              "
+              class="friend-seat"
+              :style="{ transform: calculateRotate(i, true, boardSeats.length), translate: '0 -50%' }"
+              role="status"
+            >
+              <span class="friend-seat-avatar" aria-hidden="true"></span>
+              <span class="friend-seat-label">{{ $t('aiArena.setupEmptySeat') }}</span>
+            </div>
+            <Player
+              v-else
+              :data-player-id="seat.player.id"
+              :player-state="seat.player"
+              :loyalty-badge="loyaltyBadges[seat.player.id]"
+              :badge-hidden="activeLoyaltyTarget === seat.player.id"
+              :thinking="thinkingPlayerIDs.includes(seat.player.id)"
+              :discussion-turn="discussionPlayerID === seat.player.id"
+              :action-timer="playerActionTimer(seat.player.id)"
+              :manual-timer="
+                stateManager.viewMode.value === 'live' && gameTimer?.isCustom && gameTimer.playerID === seat.player.id
+                  ? gameTimer
+                  : undefined
+              "
+              :voice-side="Math.sin((2 * Math.PI * i) / boardSeats.length + Math.PI) > 0.75 ? 'left' : 'right'"
+              :private-decision="
+                roomState.ai && !playerInGame && spectatorRoles[seat.player.id]
+                  ? spectatorDecisions.find((d) => d.playerID === seat.player.id)
+                  : undefined
+              "
+              :spectator-role="roomState.ai && !playerInGame ? spectatorRoles[seat.player.id] : undefined"
+              :display-kick="canKickPlayer(seat.player.id)"
+              :display-index="roomState.stage === 'started' ? gameState.features.displayIndex : false"
+              :visible-history="visibleHistory"
+              :current-stage="roomState.stage === 'started' ? gameState.stage : undefined"
+              :style="{ transform: calculateRotate(i, true, boardSeats.length), translate: '0 -50%' }"
+              @player-click="onPlayerClick"
+            />
+          </template>
         </div>
         <div ref="loyaltyEffectRef" class="board-event-effects" aria-hidden="true"></div>
         <div ref="missionEffectRef" class="board-event-effects" aria-hidden="true"></div>
@@ -189,7 +209,7 @@ import './animations/style.scss';
 
 export default defineComponent({
   name: 'Board',
-  emits: ['assassination-active'],
+  emits: ['assassination-active', 'refresh-room'],
   components: {
     Player,
     Game,
@@ -203,6 +223,7 @@ export default defineComponent({
     RoleDeal,
   },
   props: {
+    roomSyncPending: Boolean,
     spectatorDecisions: { type: Array as PropType<AiSpectatorDecision[]>, default: () => [] },
     spectatorRoles: { type: Object as PropType<Record<string, TRoles>>, default: () => ({}) },
     roomState: {
@@ -529,6 +550,80 @@ export default defineComponent({
       return roomState.value.players;
     });
 
+    type WaitingSeat = { index: number; player?: (typeof roomState.value.players)[number] };
+    const isUserInGame = computed(() =>
+      roomState.value.players.some((player) => player.id === store.state.profile?.id),
+    );
+    const normalizeSeatIndex = (player: (typeof roomState.value.players)[number], fallback: number) => {
+      const value = player as typeof player & { seat?: number; seatIndex?: number };
+      const candidate = value.seatIndex ?? value.seat;
+      return Number.isInteger(candidate) && candidate! >= 0 && candidate! < 10 ? candidate! : fallback;
+    };
+    const boardSeats = computed<WaitingSeat[]>(() => {
+      if (roomState.value.stage === 'started' || roomState.value.ai) {
+        return players.value.map((player, index) => ({ index, player: player as WaitingSeat['player'] }));
+      }
+      const serverSeats = roomState.value.seats;
+      if (Array.isArray(serverSeats) && serverSeats.length === 10) {
+        const playersByID = new Map(roomState.value.players.map((player) => [player.id, player]));
+        return serverSeats.map((id, index) => ({ index, player: id ? playersByID.get(id) : undefined }));
+      }
+      const occupied = new Map<number, WaitingSeat['player']>();
+      roomState.value.players.forEach((player, index) => occupied.set(normalizeSeatIndex(player, index), player));
+      return Array.from({ length: 10 }, (_, index) => ({ index, player: occupied.get(index) }));
+    });
+    const seatAction = ref<number | 'join' | 'leave'>();
+    const seatDisabled = computed(() => props.roomSyncPending || seatAction.value !== undefined);
+    const seatLabel = (index: number) => {
+      if (seatAction.value === index) return t(isUserInGame.value ? 'startPanel.movingSeat' : 'startPanel.joiningSeat');
+      return t(isUserInGame.value ? 'startPanel.moveToSeat' : 'startPanel.openSeat', { seat: index + 1 });
+    };
+    const changeSeat = async (action: number | 'join' | 'leave') => {
+      if (seatAction.value !== undefined) return;
+      if (!socket.connected) {
+        eventBus.emit('infoMessage', t('startPanel.seatReconnect'));
+        emit('refresh-room');
+        return;
+      }
+      const roomID = roomState.value.roomID;
+      seatAction.value = action;
+      try {
+        const request = socket.timeout(6000);
+        const result = typeof action === 'number'
+          ? await request.emitWithAck('seatGame', roomID, action)
+          : await request.emitWithAck(action === 'join' ? 'joinGame' : 'leaveGame', roomID);
+        if (roomID !== roomState.value.roomID) return;
+        if (result === true) {
+          if (action === 'leave') eventBus.emit('infoMessage', t('startPanel.seatReleased'));
+          return;
+        }
+        const code = result?.error;
+        const reason = code && ['seatOccupied', 'seatLocked', 'seatStarted', 'seatFull', 'roomUnavailable'].includes(code)
+          ? `startPanel.${code}`
+          : 'errors.requestFailed';
+        eventBus.emit('infoMessage', t(reason));
+      } catch {
+        if (roomID !== roomState.value.roomID) return;
+        eventBus.emit('infoMessage', t('startPanel.seatTimeout'));
+        emit('refresh-room');
+      } finally {
+        seatAction.value = undefined;
+      }
+    };
+    const onSeatClick = (seatIndex: number) => {
+      if (roomState.value.ai) return;
+      if (
+        roomState.value.stage !== 'created' &&
+        !(roomState.value.stage === 'locked' && isUserInGame.value)
+      )
+        return;
+      if (!store.state.profile) {
+        eventBus.emit('openAuthModal', () => onSeatClick(seatIndex), 'join_room');
+        return;
+      }
+      void changeSeat(seatIndex);
+    };
+
     const userIsLeader = computed(() => {
       return !roomState.value.ai && store.state.profile?.id === roomState.value.leaderID;
     });
@@ -575,8 +670,8 @@ export default defineComponent({
       if (!room.ai.withFriend && actionTimerPlayerID.value === id) return room.ai;
     };
 
-    const calculateRotate = (i: number, negative: boolean = false) => {
-      return `rotate(${negative ? '-' : ''}${(360 / players.value.length) * i + 180}deg)`;
+    const calculateRotate = (i: number, negative: boolean = false, seatCount = players.value.length) => {
+      return `rotate(${negative ? '-' : ''}${(360 / seatCount) * i + 180}deg)`;
     };
 
     const clearHistoryElement = () => {
@@ -810,6 +905,13 @@ export default defineComponent({
       gameState,
       liveGame,
       players,
+      boardSeats,
+      isUserInGame,
+      seatLabel,
+      seatAction,
+      seatDisabled,
+      changeSeat,
+      onSeatClick,
       playerInGame,
       discussionPlayerID,
       thinkingPlayerIDs,
@@ -989,6 +1091,67 @@ export default defineComponent({
   color: #f1f6fb;
   font-size: 16px;
   font-weight: 400;
+  line-height: 1.5;
+  box-shadow: 0 3px 10px #10182255;
+}
+
+.open-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 125px;
+  height: 150px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.open-seat:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+.open-seat-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 115px;
+  width: 115px;
+  height: 115px;
+  border: 3px dashed #8da4b9;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #f9fbff 0 8%, transparent 9%), linear-gradient(145deg, #405366, #172530 72%);
+  box-shadow: 0 10px 18px #0d172255, inset 0 0 0 7px #243746, inset 0 0 0 9px #dce7f055;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.open-seat:hover:not(:disabled) .open-seat-avatar,
+.open-seat:focus-visible:not(:disabled) .open-seat-avatar {
+  border-color: #e4c87f;
+  box-shadow: 0 0 0 4px #e4c87f44, 0 10px 20px #0d172255, inset 0 0 0 7px #243746, inset 0 0 0 9px #dce7f055;
+  transform: scale(1.03);
+}
+.open-seat-avatar span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #c8d5e4;
+  border-radius: 50%;
+  color: #f3f7fb;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+}
+.open-seat-label {
+  width: 115px;
+  padding: 4px 8px;
+  border: 1px solid #91a4b8;
+  border-radius: 999px;
+  background: #1e2d3a;
+  color: #f1f6fb;
+  font-size: 14px;
+  font-weight: 500;
   line-height: 1.5;
   box-shadow: 0 3px 10px #10182255;
 }

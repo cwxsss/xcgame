@@ -19,6 +19,8 @@ export type WaitingRoomSnapshot = {
   stage: 'created' | 'locked';
   leaderID: string;
   players: string[];
+  /** Optional for compatibility with snapshots written before selectable seats. */
+  seats?: Array<string | null>;
   options: GameOptions;
   roomBots: RoomBot[];
   chat: ChatMessage[];
@@ -69,6 +71,13 @@ export function parseRoomSnapshot(value: unknown): RoomSnapshot | null {
     !value.players.every((id): id is string => typeof id === 'string' && idPattern.test(id)) ||
     new Set(value.players).size !== value.players.length ||
     !value.players.includes(value.leaderID) ||
+    (value.seats !== undefined &&
+      (!Array.isArray(value.seats) ||
+        value.seats.length !== 10 ||
+        !value.seats.every((id) => id === null || (typeof id === 'string' && idPattern.test(id))) ||
+        new Set(value.seats.filter((id): id is string => id !== null)).size !==
+          value.seats.filter((id): id is string => id !== null).length ||
+        value.seats.some((id) => id !== null && !(value.players as string[]).includes(id)))) ||
     !isRecord(value.options) ||
     !Array.isArray(value.roomBots) ||
     value.roomBots.length > 9 ||
@@ -122,6 +131,7 @@ export function parseRoomSnapshot(value: unknown): RoomSnapshot | null {
     stage: value.stage,
     leaderID: value.leaderID,
     players: [...value.players] as string[],
+    ...(value.seats !== undefined ? { seats: [...value.seats] as Array<string | null> } : {}),
     options,
     roomBots: roomBots.map((bot) => ({ id: bot.id, ...(bot.role ? { role: bot.role } : {}) })),
     chat: [...value.chat] as ChatMessage[],

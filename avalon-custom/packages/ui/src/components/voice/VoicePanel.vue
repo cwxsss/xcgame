@@ -23,6 +23,12 @@
         </span>
         <VoiceIcon :name="open ? 'chevronDown' : 'chevronUp'" class="voice-chevron" />
       </button>
+      <span
+        v-if="voice.status.value !== 'idle'"
+        class="voice-dock-state"
+        role="status"
+        aria-live="polite"
+      >{{ voiceDockLabel }}</span>
       <button
         v-if="isConnected"
         type="button"
@@ -47,7 +53,7 @@
         :title="talkMode === 'pushToTalk' ? $t('voice.talkModeHold') : micLabel"
         :aria-label="talkMode === 'pushToTalk' ? $t('voice.talkModeHold') : micLabel"
         :aria-pressed="talkMode === 'pushToTalk' ? pushToTalkActive : voice.microphoneEnabled.value"
-        :disabled="talkMode === 'toggle' && voice.microphonePending.value"
+        :disabled="voice.reconnecting.value || (talkMode === 'toggle' && voice.microphonePending.value)"
         @click="talkMode === 'toggle' ? toggleMic() : undefined"
         @pointerdown="beginPushToTalk"
         @pointerup="endPushToTalk"
@@ -82,6 +88,10 @@
               <h2>{{ $t('voice.panelTitle') }}</h2>
             </div>
             <p class="voice-status" role="status"><i v-if="isConnected" class="voice-dot" />{{ connectionLabel }}</p>
+            <p v-if="isConnected" class="voice-activity-status" role="status" aria-live="polite">
+              <i class="voice-activity-dot" :class="{ 'is-live': voice.speaking.value }" aria-hidden="true" />
+              {{ voiceActivityLabel }}
+            </p>
           </div>
           <button
             type="button"
@@ -103,7 +113,7 @@
                 :class="{ 'is-muted': !voice.microphoneEnabled.value }"
                 :aria-label="micLabel"
                 :aria-pressed="voice.microphoneEnabled.value"
-                :disabled="voice.microphonePending.value"
+                :disabled="voice.reconnecting.value || voice.microphonePending.value"
                 @click="toggleMic"
               >
                 <span class="voice-microphone-icon"
@@ -333,6 +343,22 @@ const isConnected = computed(() => voice.status.value === 'connected');
 const participantCount = computed(() =>
   isConnected.value ? voice.participants.value.length + 1 : (voice.state.value.participantCount ?? 0),
 );
+const remoteSpeakingCount = computed(() => voice.participants.value.filter((participant) => participant.speaking).length);
+const voiceActivityLabel = computed(() => {
+  if (voice.reconnecting.value) return t('voice.statusReconnecting');
+  if (voice.microphonePending.value) return t('voice.micWaiting');
+  if (voice.speaking.value) return t('voice.statusSpeakingYou');
+  if (remoteSpeakingCount.value > 0)
+    return t('voice.statusRemoteSpeaking', { count: remoteSpeakingCount.value });
+  if (voice.microphoneEnabled.value) return t('voice.statusMicOn');
+  return t('voice.statusListening');
+});
+const voiceDockLabel = computed(() => {
+  if (voice.reconnecting.value) return t('voice.statusReconnecting');
+  if (voice.status.value === 'connecting') return t('voice.connecting');
+  if (!isConnected.value) return t('voice.notConnected');
+  return voiceActivityLabel.value;
+});
 const micLabel = computed(() => t(voice.microphoneEnabled.value ? 'voice.disableMic' : 'voice.enableMic'));
 type VoiceTalkMode = 'toggle' | 'pushToTalk';
 const talkModePreferenceKey = 'avalon.voice.talk-mode.v1';
@@ -394,7 +420,7 @@ const endPushToTalk = (event?: Event) => {
   if (shouldStopMicrophone) void voice.setMicrophoneEnabled(false);
 };
 const beginPushToTalk = (event?: PointerEvent) => {
-  if (talkMode.value !== 'pushToTalk' || !isConnected.value || voice.microphonePending.value) return;
+  if (talkMode.value !== 'pushToTalk' || !isConnected.value || voice.reconnecting.value || voice.microphonePending.value) return;
   if (event && !event.isPrimary) return;
   if (event && event.currentTarget instanceof HTMLElement) {
     pushToTalkPointerID = event.pointerId;
@@ -431,6 +457,9 @@ const toggleTalkMode = () => {
     /* voice mode persistence is optional */
   }
 };
+watch(voice.reconnecting, (reconnecting) => {
+  if (reconnecting) endPushToTalk();
+});
 watch(voice.microphoneError, (failure) => {
   if (failure) {
     open.value = true;
@@ -460,6 +489,7 @@ watch(isConnected, (connected) => {
 });
 const connectionLabel = computed(() => {
   if (!voice.state.value.available) return t('voice.unavailable');
+  if (voice.reconnecting.value) return t('voice.statusReconnecting');
   if (isConnected.value) return t('voice.connected');
   if (voice.status.value === 'connecting') return t('voice.connecting');
   return t('voice.notConnected');
@@ -507,6 +537,11 @@ const revoked = (sessionID: string) => void voice.revoke(sessionID);
 const disconnected = () => voice.disconnected();
 const connected = () => scheduleRefresh();
 const handleWindowBlur = () => endPushToTalk();
+const handlePointerCancel = () => endPushToTalk();
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') endPushToTalk();
+};
+const handlePageHide = () => endPushToTalk();
 watch(
   () => props.roomUuid,
   (roomID) => {
@@ -531,6 +566,9 @@ onMounted(() => {
   socket.on('disconnect', disconnected);
   socket.on('connect', connected);
   window.addEventListener('blur', handleWindowBlur);
+  window.addEventListener('pointercancel', handlePointerCancel, true);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('pagehide', handlePageHide);
   refresh();
 });
 onUnmounted(() => {
@@ -539,6 +577,9 @@ onUnmounted(() => {
   socket.off('disconnect', disconnected);
   socket.off('connect', connected);
   window.removeEventListener('blur', handleWindowBlur);
+  window.removeEventListener('pointercancel', handlePointerCancel, true);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('pagehide', handlePageHide);
   endPushToTalk();
   clearTimeout(voiceToastTimer);
   clearTimeout(refreshTimer);
@@ -632,6 +673,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-weight: 650;
+}
+.voice-dock-state {
+  max-width: 148px;
+  overflow: hidden;
+  color: rgba(var(--v-theme-text-primary), 0.72);
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .voice-count {
   display: flex;
@@ -741,6 +791,27 @@ onUnmounted(() => {
   gap: 6px;
   font-size: 12px;
   margin: 5px 0 0;
+}
+.voice-activity-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 17px;
+  margin: 3px 0 0;
+  color: rgba(var(--v-theme-text-primary), 0.72);
+  font-size: 11px;
+}
+.voice-activity-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(var(--v-theme-text-primary), 0.35);
+}
+.voice-activity-dot.is-live {
+  background: rgb(var(--v-theme-success));
+  box-shadow: 0 0 0 4px rgba(var(--v-theme-success), 0.16);
 }
 .voice-icon-button {
   display: grid;
@@ -1067,6 +1138,18 @@ onUnmounted(() => {
   }
   .voice-dock-label {
     font-size: 13px;
+  }
+  .voice-dock-state {
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 0;
+    max-width: min(180px, calc(100vw - 20px));
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: rgb(var(--v-theme-inset));
+    box-shadow: 0 2px 8px #0002;
+    white-space: normal;
+    pointer-events: none;
   }
   .voice-chevron {
     display: none;

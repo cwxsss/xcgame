@@ -108,6 +108,7 @@ const acknowledgements: Record<string, number> = {
   consumeAiBotReset: 1,
   setAiBotQuotaThresholds: 1,
   createRoom: 0,
+  createRoomOnce: 1,
   joinRoom: 1,
   joinAiRoom: 1,
   finishAiDiscussion: 1,
@@ -151,6 +152,7 @@ const acknowledgements: Record<string, number> = {
   getLoyaltyWithCard: 2,
   setVoiceEnabled: 2,
   setRoomBots: 2,
+  seatGame: 2,
 };
 const nonIDs = new Set([
   'createGuest',
@@ -177,10 +179,16 @@ const booleanSecond = new Set([
   'setVoiceEnabled',
 ]);
 export function validPacket(event: string, args: unknown[]): boolean {
+  if (event === 'joinGame' || event === 'leaveGame') {
+    return validID(args[0]) && (args.length === 1 || (args.length === 2 && typeof args[1] === 'function'));
+  }
   const ack = event === 'createHumanAiRoom' && args.length === 2 ? 1 : acknowledgements[event];
   if (ack !== undefined && (args.length !== ack + 1 || typeof args[ack] !== 'function')) return false;
   const values = ack !== undefined ? args.slice(0, ack) : args;
   if (values.length > 4) return false;
+  if (event === 'createRoomOnce') {
+    return typeof values[0] === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(values[0]);
+  }
   if (event === 'setAiBotQuotaThresholds') return validBotQuotaThresholds(values[0]);
   if (event === 'unlockRoomAdmin') return typeof values[0] === 'string' && values[0].length <= 128;
   if (event === 'consumeAiBotReset') return validBotResetRequest(values[0]);
@@ -306,6 +314,16 @@ export function validPacket(event: string, args: unknown[]): boolean {
       values.length === 2 && validID(values[0]) && Array.isArray(bots) && bots.length <= 9 &&
       bots.every((bot) => record(bot) && Object.keys(bot).every((key) => key === 'role') &&
         (bot.role === undefined || (typeof bot.role === 'string' && roles.includes(bot.role))))
+    );
+  }
+  if (event === 'seatGame') {
+    return (
+      values.length === 2 &&
+      validID(values[0]) &&
+      typeof values[1] === 'number' &&
+      Number.isInteger(values[1]) &&
+      values[1] >= 0 &&
+      values[1] < 10
     );
   }
   if (event === 'registerUser') {

@@ -33,6 +33,7 @@ export type VoicePreferenceStore = {
 };
 
 type Preferences = { masterVolume: number; users: Record<string, { volume: number; muted: boolean }> };
+type QueuedMicrophoneState = { enabled: boolean; generation: number; client: VoiceClient };
 const preferenceKey = 'avalon.voice.preferences.v1';
 const emptyState: VoiceState = { available: false, canJoin: false, participantCount: 0 };
 const clamp = (value: number) => (Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : 100);
@@ -83,6 +84,15 @@ export function createRoomVoice(
   const microphonePending = ref(false);
   const microphoneError = ref<'permission' | 'missing' | 'busy' | 'failed'>();
   const participants = ref<VoiceParticipant[]>([]);
+  // Keep the most recent intent while a browser permission/device request is in
+  // flight. This is especially important for push-to-talk: releasing the key
+  // or pointer before getUserMedia resolves must not be dropped.
+  const queuedMicrophoneState: { current?: QueuedMicrophoneState } = {};
+  const consumeQueuedMicrophoneState = (): QueuedMicrophoneState | undefined => {
+    const queued = queuedMicrophoneState.current as QueuedMicrophoneState | undefined;
+    queuedMicrophoneState.current = undefined;
+    return queued;
+  };
   const masterVolume = ref(preferences.masterVolume);
   const persist = () => {
     try {
@@ -136,6 +146,7 @@ export function createRoomVoice(
     reconnecting.value = false;
     microphonePending.value = false;
     microphoneError.value = undefined;
+    queuedMicrophoneState.current = undefined;
     playbackBlocked.value = false;
     participants.value = [];
     status.value = 'idle';
@@ -256,9 +267,14 @@ export function createRoomVoice(
     }
   };
   const setMicrophoneEnabled = async (enabled: boolean) => {
-    if (!client || status.value !== 'connected' || microphonePending.value) return;
+    if (!client || status.value !== 'connected') return;
     const target = client;
     const current = generation;
+    if (microphonePending.value) {
+      queuedMicrophoneState.current = { enabled, generation: current, client: target };
+      return;
+    }
+    queuedMicrophoneState.current = undefined;
     microphonePending.value = true;
     microphoneError.value = undefined;
     try {
@@ -281,7 +297,18 @@ export function createRoomVoice(
                 : 'failed';
       }
     } finally {
-      if (current === generation) microphonePending.value = false;
+      if (current === generation) {
+        microphonePending.value = false;
+        const queued = consumeQueuedMicrophoneState();
+        if (
+          queued &&
+          queued.generation === generation &&
+          queued.client === client &&
+          queued.enabled !== microphoneEnabled.value
+        ) {
+          void setMicrophoneEnabled(queued.enabled);
+        }
+      }
     }
   };
   const startAudio = async () => {

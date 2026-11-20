@@ -58,9 +58,11 @@ export function createLiveKitVoiceClient({ Room, RoomEvent, Track }: typeof impo
       room.on(RoomEvent.TrackUnpublished, (_publication, participant) => reportAudio(participant));
       room.on(RoomEvent.LocalTrackPublished, () => reportAudio(room.localParticipant));
       room.on(RoomEvent.LocalTrackUnpublished, () => reportAudio(room.localParticipant));
-      room.on(RoomEvent.Reconnecting, () => {
+      const reportReconnecting = () => {
         if (!closed) events.onReconnecting?.(true);
-      });
+      };
+      room.on(RoomEvent.SignalReconnecting, reportReconnecting);
+      room.on(RoomEvent.Reconnecting, reportReconnecting);
       room.on(RoomEvent.Reconnected, () => {
         if (closed) return;
         reportAllAudio();

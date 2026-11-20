@@ -7,6 +7,7 @@ export default {
     rateLimited: '请求过于频繁，请稍后重试。',
     invalidRequest: '请检查输入的信息。',
     requestFailed: '请求失败，请重试。',
+    serverRestarting: '游戏服务正在重启，请稍后重试。',
     roomLimit: '房间数量已达上限，请稍后重试。',
     forbidden: '您无权执行此操作。',
 

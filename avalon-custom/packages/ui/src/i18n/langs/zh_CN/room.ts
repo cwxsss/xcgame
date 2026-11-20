@@ -4,9 +4,13 @@
  */
 export default {
   room: {
-    errorNotFound: '这是错误的uuid',
+    errorNotFound: '找不到这个房间。',
+    connectionFailed: '暂时无法连接到房间。',
+    reconnect: '重新连接',
+    reconnecting: '正在重新连接房间…',
     backToLobby: '返回大厅',
     restartGame: '重开游戏',
+    goToNextGame: '前往新一局',
   },
   mainPage: {
     newPlayerTitle: '阿瓦隆是什么桌游？',
@@ -35,6 +39,8 @@ export default {
 
     retryAi: '重试',
     showMore: '显示更多游戏',
+    previousPage: '上一页',
+    nextPage: '下一页',
     heroCaption: '信任。欺骗。阿瓦隆。',
     filterLabel: '筛选游戏',
     filterall: '全部',

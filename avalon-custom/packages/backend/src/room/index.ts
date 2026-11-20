@@ -10,6 +10,12 @@ import * as _ from 'lodash';
 import { BuiltinBotRunner, validateBuiltinBotOptions, type RoomBotConfig } from '@/room/builtin-bots';
 import { validateRoleOptions } from '@/core/game/helpers';
 
+export class RoomSeatError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
 export class Room {
   onChatMessage?: (entry: import('@avalon/types').ChatMessage) => void;
   persistChatMessage?: (userID: string, text: string, requestID?: string) => Promise<unknown>;
@@ -17,6 +23,8 @@ export class Room {
   roomID: string;
   nextRoomID?: string;
   players: string[];
+  /** Physical seats in clockwise table order. Null means the seat is vacant. */
+  seats: Array<string | null>;
   leaderID: string;
   vote?: VoteInRoom;
   chat: Chat;
@@ -30,7 +38,14 @@ export class Room {
   startAt?: string;
   io: Server;
 
-  constructor(roomID: string, leaderID: string, players: string[], io: Server, options?: GameOptions) {
+  constructor(
+    roomID: string,
+    leaderID: string,
+    players: string[],
+    io: Server,
+    options?: GameOptions,
+    seats?: Array<string | null>,
+  ) {
     this.io = io;
     this.roomID = roomID;
     this.players = players;
@@ -45,36 +60,118 @@ export class Room {
       },
     };
     this.createAt = String(new Date());
+    this.seats = this.buildSeats(seats);
+  }
+
+  private buildSeats(assignments?: Array<string | null>): Array<string | null> {
+    const seats = Array<string | null>(this.maxCapacity).fill(null);
+    const known = new Set<string>();
+    const source = assignments?.length === this.maxCapacity ? assignments : this.players.map((id) => id);
+    for (const [index, id] of source.entries()) {
+      if (index >= this.maxCapacity || id === null || typeof id !== 'string' || !this.players.includes(id) || known.has(id))
+        continue;
+      seats[index] = id;
+      known.add(id);
+    }
+    for (const id of this.players) {
+      if (known.has(id)) continue;
+      const index = seats.findIndex((seat) => seat === null);
+      if (index === -1) break;
+      seats[index] = id;
+      known.add(id);
+    }
+    return seats;
+  }
+
+  /** Repair state loaded from an older snapshot before an operation uses it. */
+  private ensureSeats() {
+    const rebuilt = this.buildSeats(this.seats);
+    const changed = rebuilt.some((id, index) => id !== this.seats[index]);
+    if (changed || rebuilt.length !== this.seats.length) this.seats = rebuilt;
+    this.players = this.seats.filter((id): id is string => id !== null);
+  }
+
+  /** Copy the physical seating map for durable waiting-room snapshots. */
+  getSeatAssignments(): Array<string | null> {
+    this.ensureSeats();
+    return [...this.seats];
+  }
+
+  /** Restore an optional seating map from a compatible waiting-room snapshot. */
+  restoreSeatAssignments(assignments?: Array<string | null>) {
+    if (!assignments) return;
+    this.seats = this.buildSeats(assignments);
+    this.players = this.seats.filter((id): id is string => id !== null);
   }
 
   joinGame(userID: string) {
     if (this.data.stage !== 'created') {
-      throw new Error(`${userID} try to join game with id ${this.roomID} with stage ${this.data.stage}`);
+      throw this.data.stage === 'locked'
+        ? new RoomSeatError('seatLocked', 'The room is locked')
+        : new RoomSeatError('seatStarted', 'Seats cannot be changed after the game starts');
     }
 
-    if (!this.players.find((id) => id === userID) && this.players.length < this.maxCapacity) {
-      this.players.push(userID);
+    this.ensureSeats();
+    if (!this.players.find((id) => id === userID)) {
+      const seatIndex = this.seats.findIndex((seat) => seat === null);
+      if (seatIndex === -1) throw new RoomSeatError('seatFull', 'The room is full');
+      this.seats[seatIndex] = userID;
+      this.players = this.seats.filter((id): id is string => id !== null);
       this.updateRoomState();
     }
   }
 
+  /**
+   * Atomically claim or move a human to a physical waiting-room seat. A seat
+   * occupied by another player (including a configured local bot) is never
+   * overwritten; the first accepted socket event wins.
+   */
+  seatGame(userID: string, seatIndex: number) {
+    if (this.data.stage !== 'created' && this.data.stage !== 'locked') {
+      throw new RoomSeatError('seatStarted', 'Seats cannot be changed after the game starts');
+    }
+    if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex >= this.maxCapacity) {
+      throw new Error('Invalid seat');
+    }
+    this.ensureSeats();
+    if (this.roomBots.some((bot) => bot.id === userID)) throw new Error('AI seats cannot be moved');
+    const currentIndex = this.seats.indexOf(userID);
+    if (this.data.stage === 'locked' && currentIndex === -1)
+      throw new RoomSeatError('seatLocked', 'The room is locked');
+    const target = this.seats[seatIndex];
+    if (target !== null && target !== userID) throw new RoomSeatError('seatOccupied', 'Seat is occupied');
+    if (currentIndex === seatIndex) return;
+    if (currentIndex !== -1) this.seats[currentIndex] = null;
+    this.seats[seatIndex] = userID;
+    this.players = this.seats.filter((id): id is string => id !== null);
+    this.updateRoomState(true);
+  }
+
   leaveGame(userID: string) {
     if (this.data.stage === 'started') {
-      throw new Error(`${userID} try to leave game with id ${this.roomID} with stage 'started'`);
+      throw new RoomSeatError('seatStarted', 'Seats cannot be changed after the game starts');
     }
 
-    const userIndex = this.players.findIndex((id) => id === userID);
+    this.ensureSeats();
+    const seatIndex = this.seats.indexOf(userID);
 
-    if (userIndex !== -1) {
-      this.players.splice(userIndex, 1);
-    }
+    if (seatIndex !== -1) this.seats[seatIndex] = null;
+    this.players = this.seats.filter((id): id is string => id !== null);
 
     if (userID === this.leaderID) {
       if (this.players.length === 0) {
         this.destroyRoom();
         return;
       } else {
-        this.leaderID = this.players[0];
+        const nextHuman = this.players.find((id) => !this.roomBots.some((bot) => bot.id === id));
+        // A local bot must never become the room administrator. If the last
+        // human leaves a bot-filled waiting room, close it instead of leaving
+        // an unmanageable table behind.
+        if (!nextHuman) {
+          this.destroyRoom();
+          return;
+        }
+        this.leaderID = nextHuman;
       }
     }
 
@@ -127,6 +224,7 @@ export class Room {
     selectedRole?: { userID: string; role: import('@avalon/types').TRoles } | Array<{ userID: string; role: TRoles }>,
     options: GameOptions = this.options,
   ) {
+    if (!this.ai) this.ensureSeats();
     if (this.roomBots.length) validateBuiltinBotOptions(options);
     const selectedBots = this.roomBots
       .filter((bot): bot is RoomBotConfig & { role: TRoles } => Boolean(bot.role))
@@ -171,15 +269,18 @@ export class Room {
   }
 
   calculateRoomState(userID?: string): TRoomState {
+    if (!this.ai) this.ensureSeats();
     const roomState = {
       ai: this.ai,
       archived: Boolean(this.nextRoomID),
+      nextRoomID: this.nextRoomID,
       roomID: this.roomID,
       leaderID: this.leaderID,
       vote: this.vote,
       chat: this.chat.history,
       options: this.options,
       players: this.players.map((id) => ({ id, isLeader: id === this.leaderID })),
+      ...(!this.ai ? { seats: [...this.seats] } : {}),
       createAt: this.createAt,
       roomBots: this.roomBots.map((bot): RoomBot => ({ id: bot.id, ...(userID === this.leaderID && this.data.stage !== 'started' && bot.role ? { role: bot.role } : {}) })),
     };
@@ -239,11 +340,18 @@ export class Room {
         if (count > configured) throw new Error(`Too many bots assigned role: ${role}`);
       }
     }
+    this.ensureSeats();
     const humanPlayers = this.players.filter((id) => !this.roomBots.some((bot) => bot.id === id));
     if (humanPlayers.length + bots.length > this.maxCapacity) throw new Error('A game supports at most 10 seats');
     const nextBots = bots.map((bot, index) => ({ id: `avalon-agent-${index + 1}`, role: bot.role }));
     this.roomBots = nextBots;
-    this.players = [...humanPlayers, ...nextBots.map((bot) => bot.id)];
+    this.seats = this.seats.map((id) => (id && !humanPlayers.includes(id) ? null : id));
+    for (const bot of nextBots) {
+      const seatIndex = this.seats.findIndex((id) => id === null);
+      if (seatIndex === -1) throw new Error('A game supports at most 10 seats');
+      this.seats[seatIndex] = bot.id;
+    }
+    this.players = this.seats.filter((id): id is string => id !== null);
     this.updateRoomState(true);
   }
 
@@ -321,7 +429,9 @@ export class Room {
       throw new Error('You cant shuffle started game');
     }
 
-    this.players = _.shuffle(this.players);
+    this.ensureSeats();
+    this.seats = _.shuffle(this.seats);
+    this.players = this.seats.filter((id): id is string => id !== null);
 
     this.updateRoomState();
   }

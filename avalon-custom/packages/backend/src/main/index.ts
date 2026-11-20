@@ -13,7 +13,7 @@ import { ChatService } from '@/room/chat-service';
 import { ChatRepository } from '@/room/chat-repository';
 import { registerStickerEndpoints } from '@/stickers/endpoints';
 import { StickersManager } from '@/stickers';
-import { Room } from '@/room';
+import { Room, RoomSeatError } from '@/room';
 import { Chat } from '@/room/chat';
 import { GameManager } from '@/core/game-manager';
 import type {
@@ -30,6 +30,7 @@ import type { Server, ServerSocket } from '@avalon/types';
 import crypto from 'crypto';
 
 import { handleSocketErrors, eventBus } from '@/helpers';
+import { Drain } from '@/helpers/drain';
 import { GameResultWorker } from '@/scripts/game-results';
 import { DBManager } from '@/db';
 import { installSessionChecks } from '@/user/sessions';
@@ -43,6 +44,25 @@ import {
 const roomRetentionMs = 30 * 60000;
 const startedRoomSnapshotRetentionMs = 24 * 60 * 60000;
 const roomCleanupRetryMs = 60000;
+const finishedLobbyLimit = 50;
+const firstSnapshotRetryMs = 2000;
+
+function derivedRoomID(kind: 'created' | 'next', ...parts: string[]): string {
+  const digest = crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+  return `${kind}-${digest.slice(0, 32)}`;
+}
+
+function lobbyOrder(rooms: TRoomsList): TRoomsList {
+  const active: TRoomsList = [];
+  const finished: TRoomsList = [];
+  for (const room of rooms) {
+    (room.result || room.aiStatus === 'finished' ? finished : active).push(room);
+  }
+  active.sort((a, b) => Number(b.state === 'created') - Number(a.state === 'created') ||
+    Date.parse(b.createAt) - Date.parse(a.createAt));
+  finished.sort((a, b) => Date.parse(b.startAt || b.createAt) - Date.parse(a.startAt || a.createAt));
+  return [...active, ...finished.slice(0, finishedLobbyLimit)];
+}
 
 export class Manager {
   voice: VoiceService;
@@ -56,6 +76,11 @@ export class Manager {
   private roomAdminSessions = new WeakMap<ServerSocket, number>();
   private roomTimers = new Map<string, NodeJS.Timeout>();
   private roomSnapshotWrites = new Map<string, Promise<void>>();
+  private roomSnapshotRetry = new Map<string, { failures: number; timer?: NodeJS.Timeout }>();
+  private stopping = false;
+  private readonly socketDrain = new Drain();
+  private stopResultRetry?: () => void;
+  private flushArchivesOnShutdown?: () => Promise<void>;
   // Track when a live table becomes empty so disconnected test rooms expire.
   private emptyRoomSince = new Map<string, number>();
   // Do not expire rooms that were only created by the server (or restored in a
@@ -73,11 +98,42 @@ export class Manager {
     return this.removedLobbyRooms.has(uuid);
   }
 
-  get roomListCutted() {
-    return this.roomsList.slice(0, 20);
+  async saveBeforeShutdown(): Promise<void> {
+    this.stopping = true;
+    for (const retry of this.roomSnapshotRetry.values()) clearTimeout(retry.timer);
+    this.roomSnapshotRetry.clear();
+    await this.socketDrain.close();
+    await this.initialized;
+    this.stopResultRetry?.();
+    for (const timer of this.roomTimers.values()) clearTimeout(timer);
+    this.roomTimers.clear();
+    for (const room of Object.values(this.rooms)) {
+      if (room.ai) continue;
+      room.stopBuiltinBots();
+      if (room.data.stage === 'started') room.data.manager.game.timer.suspend();
+      void this.queueRoomSnapshot(room.roomID);
+    }
+    const persisted = await Promise.allSettled([
+      ...this.roomSnapshotWrites.values(),
+      this.flushArchivesOnShutdown?.(),
+    ]);
+    // A durable game result can enqueue its snapshot removal while the archive queue drains.
+    const cleanup = await Promise.allSettled(this.roomSnapshotWrites.values());
+    if ([...persisted, ...cleanup].some((result) => result.status === 'rejected'))
+      throw Error('Room save failed during shutdown');
   }
 
-  createRoom(uuid: string, leaderID: string, players: string[], options?: GameOptions) {
+  get roomListCutted() {
+    return lobbyOrder(this.roomsList);
+  }
+
+  createRoom(
+    uuid: string,
+    leaderID: string,
+    players: string[],
+    options?: GameOptions,
+    seating?: Pick<Room, 'seats' | 'roomBots'>,
+  ) {
     const retained = Object.values(this.rooms);
     if (
       retained.length >= 500 ||
@@ -89,12 +145,40 @@ export class Manager {
       ).length >= 3
     )
       throw Error('roomLimit');
-    this.rooms[uuid] = new Room(uuid, leaderID, players, this.io, options);
-    this.bindRoomPersistence(this.rooms[uuid]);
+    const room = new Room(uuid, leaderID, players, this.io, options, seating?.seats);
+    if (seating) room.roomBots = structuredClone(seating.roomBots);
+    this.rooms[uuid] = room;
+    this.bindRoomPersistence(room);
 
-    this.updateRoomsList(this.rooms[uuid]);
+    this.updateRoomsList(room);
     this.queueRoomSnapshot(uuid);
     this.scheduleRoomExpiry(uuid, roomRetentionMs);
+  }
+
+  private async existingRoom(roomID: string): Promise<boolean> {
+    if (this.removedLobbyRooms.has(roomID)) return false;
+    if (this.rooms[roomID]) return true;
+    const saved = await Promise.all([
+      this.dbManager.getRoomFromDB(roomID),
+      this.dbManager.getWaitingRoomSnapshot(roomID),
+      this.dbManager.getStartedRoomSnapshot(roomID),
+    ]);
+    return !this.removedLobbyRooms.has(roomID) && (Boolean(this.rooms[roomID]) || saved.some(Boolean));
+  }
+
+  private async resolveRematch(oldRoomID: string, knownNextID?: string): Promise<string | undefined> {
+    const nextID = knownNextID ?? derivedRoomID('next', oldRoomID);
+    // Looking at a finished game should work even if the optional link cannot be loaded.
+    const exists = await this.existingRoom(nextID).catch(() => false);
+    return exists ? nextID : undefined;
+  }
+
+  private async archivedRoomState(room: StartedRoomState): Promise<StartedRoomState> {
+    const [chat, nextRoomID] = await Promise.all([
+      this.chatService.history(room.roomID, room.chat),
+      room.ai ? undefined : this.resolveRematch(room.roomID),
+    ]);
+    return publicRoomState({ ...room, chat, archived: true, nextRoomID });
   }
 
   private scheduleRoomExpiry(uuid: string, initialDelay: number) {
@@ -146,7 +230,11 @@ export class Manager {
   }
 
   private queueRoomSnapshot(uuid: string): Promise<void> {
-    return this.queueRoomPersistence(uuid, async () => {
+    const previous = this.roomSnapshotRetry.get(uuid);
+    clearTimeout(previous?.timer);
+    const retry: { failures: number; timer?: NodeJS.Timeout } = { failures: previous?.failures ?? 0 };
+    this.roomSnapshotRetry.set(uuid, retry);
+    const save = this.queueRoomPersistence(uuid, async () => {
       if (this.removedLobbyRooms.has(uuid)) {
         await this.dbManager.deleteWaitingRoomSnapshot(uuid);
         return;
@@ -167,6 +255,7 @@ export class Manager {
           stage: room.data.stage,
           leaderID: room.leaderID,
           players: [...room.players],
+          seats: room.getSeatAssignments(),
           options: structuredClone(room.options),
           roomBots: structuredClone(room.roomBots),
           chat: structuredClone(room.chat.history),
@@ -196,6 +285,7 @@ export class Manager {
         stage: 'started',
         leaderID: room.leaderID,
         players: [...room.players],
+        seats: room.getSeatAssignments(),
         options: structuredClone(room.options),
         roomBots: structuredClone(room.roomBots),
         chat: structuredClone(room.chat.history),
@@ -207,6 +297,23 @@ export class Manager {
       };
       await this.dbManager.saveStartedRoomSnapshot(snapshot);
     });
+    void save.then(
+      () => {
+        if (this.roomSnapshotRetry.get(uuid) === retry) this.roomSnapshotRetry.delete(uuid);
+      },
+      () => {
+        if (this.roomSnapshotRetry.get(uuid) !== retry) return;
+        if (this.stopping || !this.rooms[uuid] || this.removedLobbyRooms.has(uuid)) {
+          this.roomSnapshotRetry.delete(uuid);
+          return;
+        }
+        const delay = Math.min(30000, firstSnapshotRetryMs * 2 ** retry.failures);
+        retry.failures += 1;
+        retry.timer = setTimeout(() => void this.queueRoomSnapshot(uuid), delay);
+        retry.timer.unref();
+      },
+    );
+    return save;
   }
 
   private restoreWaitingRoom(snapshot: WaitingRoomSnapshot): Room | undefined {
@@ -222,6 +329,7 @@ export class Manager {
     room.createAt = snapshot.createAt;
     room.data = { stage: snapshot.stage };
     room.roomBots = structuredClone(snapshot.roomBots);
+    room.restoreSeatAssignments(snapshot.seats);
     room.chat = new Chat();
     snapshot.chat.forEach((entry) => room.chat.append(structuredClone(entry)));
     this.rooms[snapshot.roomID] = room;
@@ -237,6 +345,7 @@ export class Manager {
       this.bindRoomPersistence(room);
       room.createAt = snapshot.createAt;
       room.roomBots = structuredClone(snapshot.roomBots);
+      room.restoreSeatAssignments(snapshot.seats);
       room.chat = new Chat();
       snapshot.chat.forEach((entry) => room.chat.append(structuredClone(entry)));
       const manager = GameManager.restore(this.io, snapshot.roomID, snapshot.gameRecovery);
@@ -304,15 +413,12 @@ export class Manager {
       if (roomIndex !== -1) {
         this.roomsList[roomIndex] = roomData;
       } else {
-        if (this.roomsList.length === 50) {
-          this.roomsList.pop();
-        }
-
         this.roomsList.unshift(roomData);
       }
     }
 
-    this.io.to('lobby').emit('roomsListUpdated', this.roomListCutted);
+    this.roomsList = this.roomListCutted;
+    this.io.to('lobby').emit('roomsListUpdated', this.roomsList);
   }
 
   generateRoomsListFromDB(rooms: StartedRoomState[]) {
@@ -340,9 +446,8 @@ export class Manager {
 
     // Existing live entries take precedence if a room was created during startup loading.
     this.roomsList = [...new Map([...roomsInfo, ...this.roomsList].map((room) => [room.uuid, room])).values()]
-      .filter((room) => !this.removedLobbyRooms.has(room.uuid) && room.aiStatus !== 'stopped' && this.rooms[room.uuid]?.ai?.status !== 'stopped')
-      .sort((a, b) => Date.parse(b.createAt) - Date.parse(a.createAt))
-      .slice(0, 50);
+      .filter((room) => !this.removedLobbyRooms.has(room.uuid) && room.aiStatus !== 'stopped' && this.rooms[room.uuid]?.ai?.status !== 'stopped');
+    this.roomsList = this.roomListCutted;
     this.io.to('lobby').emit('roomsListUpdated', this.roomListCutted);
   }
 
@@ -356,22 +461,21 @@ export class Manager {
     if (room.ai) throw new Error('Create a new AI room with AI controls');
 
     if (room.data.stage === 'started') {
-      if (room.nextRoomID) {
-        throw new Error(`Cant restart game with uuid ${uuid}, game already restarted ${room.nextRoomID}`);
-      }
+      if (room.nextRoomID) return;
 
       if (room.data.manager.game.stage === 'end') {
-        const newUUID = crypto.randomUUID();
-        const botIDs = new Set(room.roomBots.map((bot) => bot.id));
-        const humanPlayers = room.players.filter((id) => !botIDs.has(id));
-        this.createRoom(newUUID, room.leaderID, humanPlayers, room.options);
-        if (room.roomBots.length) {
-          this.rooms[newUUID].setRoomBots(room.roomBots.map(({ role }) => ({ role })));
+        const newUUID = derivedRoomID('next', uuid);
+        if (this.removedLobbyRooms.has(newUUID)) throw Error('forbidden');
+        if (!this.rooms[newUUID]) {
+          this.createRoom(newUUID, room.leaderID, [...room.players], structuredClone(room.options), {
+            seats: room.getSeatAssignments(),
+            roomBots: room.roomBots,
+          });
         }
         room.nextRoomID = newUUID;
         this.voice.destroyRoom(uuid);
 
-        this.io.to(roomChannel(room.roomID)).emit('restartGame', newUUID);
+        this.io.to(roomChannel(room.roomID)).emit('restartGame', newUUID, room.roomID);
       } else {
         throw new Error(`Cant restart game with uuid ${uuid}, room stage ${room.data.manager.game.stage}`);
       }
@@ -417,6 +521,8 @@ export class Manager {
   }
 
   private releaseRoom(uuid: string) {
+    clearTimeout(this.roomSnapshotRetry.get(uuid)?.timer);
+    this.roomSnapshotRetry.delete(uuid);
     clearTimeout(this.roomTimers.get(uuid));
     this.roomTimers.delete(uuid);
     this.emptyRoomSince.delete(uuid);
@@ -461,8 +567,8 @@ export class Manager {
 
     this.startupComplete = !dbManager.dbInstance;
     this.initialized = Promise.allSettled([
-      this.dbManager.getLastRooms(20),
-      this.aiService.archiveRepository?.recent(20) || Promise.resolve([]),
+      this.dbManager.getLastRooms(finishedLobbyLimit),
+      this.aiService.archiveRepository?.recent(finishedLobbyLimit) || Promise.resolve([]),
       this.dbManager.getWaitingRoomSnapshots(500),
       this.dbManager.getStartedRoomSnapshots(500),
     ]).then(async (results) => {
@@ -512,11 +618,13 @@ export class Manager {
         this.stickersManager.invalidateGameCounts(game.players.map((player) => player.id));
         game.players.forEach((player) => this.io.to(userChannel(player.id)).emit('stickersUpdated'));
       });
+      this.flushArchivesOnShutdown = () => results.flushArchives();
       const retry = () => {
         void results.flush().catch(() => console.error('Game result processing failed; will retry'));
       };
       const timer = setInterval(retry, 5000);
       timer.unref();
+      this.stopResultRetry = () => clearInterval(timer);
       retry();
       eventBus.on('gameEnded', (roomID) => {
         const room = this.rooms[roomID];
@@ -552,7 +660,7 @@ export class Manager {
     installSessionChecks(io);
     io.on('connection', (socket) => {
       // Register endpoints
-      handleSocketErrors(socket);
+      handleSocketErrors(socket, this.socketDrain);
       this.updateOnlineCounter('lobby', 1);
 
       const userState: {
@@ -600,23 +708,23 @@ export class Manager {
         }
 
         if (gameFromDB) {
-          const chat = await this.chatService.history(uuid, gameFromDB.chat);
-          cb(publicRoomState({ ...gameFromDB, chat, archived: true }));
+          cb(await this.archivedRoomState(gameFromDB));
           return;
         }
 
         if (room) {
           await this.chatService.history(uuid, room.chat.history);
           const current = this.rooms[uuid];
-          if (current) cb(publicRoomState(current.calculateRoomState(userState.userID)));
-          else {
+          if (current) {
+            const state = current.calculateRoomState(userState.userID);
+            if (state.nextRoomID) state.nextRoomID = await this.resolveRematch(uuid, state.nextRoomID);
+            cb(publicRoomState(state));
+          } else {
             // A post-game room may expire while its durable history is loading.
             const archived =
               (await this.dbManager.getRoomFromDB(uuid)) || (await this.aiService.archiveRepository?.load(uuid));
-            if (archived) {
-              const chat = await this.chatService.history(uuid, archived.chat);
-              cb(publicRoomState({ ...archived, chat, archived: true }));
-            } else cb({ error: 'errorNotFound' });
+            if (archived) cb(await this.archivedRoomState(archived));
+            else cb({ error: 'errorNotFound' });
           }
         } else {
           cb({ error: 'errorNotFound' });
@@ -758,6 +866,17 @@ export class Manager {
       cb(uuid);
     });
 
+    socket.on('createRoomOnce', async (requestID, cb) => {
+      if (!this.startupComplete) await this.initialized;
+      const roomID = derivedRoomID('created', userID, requestID.toLowerCase());
+      const exists = await this.existingRoom(roomID);
+      if (!exists && !this.rooms[roomID]) {
+        if (this.removedLobbyRooms.has(roomID)) return cb({ error: 'errorNotFound' });
+        this.createRoom(roomID, userID, [userID]);
+      }
+      cb(roomID);
+    });
+
     socket.on('restartGame', (uuid) => {
       if (this.rooms[uuid]?.leaderID !== userID) throw Error('forbidden');
       this.restartRoom(uuid);
@@ -767,25 +886,38 @@ export class Manager {
 
     registerChatEndpoints(socket, userID, this.chatService);
 
-    socket.on('joinGame', (uuid) => {
+    const changeSeat = (
+      uuid: string,
+      apply: (room: Room) => void,
+      callback?: (result: true | { error: string }) => void,
+    ) => {
       const room = this.rooms[uuid];
-
-      if (room) {
-        room.joinGame(userID);
-        eventBus.emit('roomUpdated', room);
+      if (!room) {
+        callback?.({ error: 'roomUnavailable' });
+        return;
       }
-    });
-
-    socket.on('leaveGame', (uuid) => {
-      const room = this.rooms[uuid];
-
-      if (room) {
-        room.leaveGame(userID);
-
-        if (this.rooms[uuid]) {
-          eventBus.emit('roomUpdated', room);
-        }
+      try {
+        apply(room);
+        if (this.rooms[uuid] === room) eventBus.emit('roomUpdated', room);
+      } catch (error) {
+        if (!(error instanceof RoomSeatError) || !callback) throw error;
+        callback({ error: error.code });
+        return;
       }
+      callback?.(true);
+    };
+
+    socket.on('joinGame', (uuid, callback) => changeSeat(uuid, (room) => room.joinGame(userID), callback));
+    socket.on('leaveGame', (uuid, callback) => changeSeat(uuid, (room) => room.leaveGame(userID), callback));
+    socket.on('seatGame', (uuid, seatIndex, callback) => {
+      changeSeat(
+        uuid,
+        (room) => {
+          if (room.ai) throw new RoomSeatError('roomUnavailable', 'This room uses separate bot seating');
+          room.seatGame(userID, seatIndex);
+        },
+        callback,
+      );
     });
 
     socket.on('lockRoom', (uuid) => {

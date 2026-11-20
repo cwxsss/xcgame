@@ -55,6 +55,30 @@ async function start() {
   const manager = new Manager(io, dbManager);
   startVoiceGateway(manager.voice);
 
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    const deadline = setTimeout(() => {
+      console.error('Timed out while saving rooms before shutdown');
+      process.exit(1);
+    }, 25000);
+    void manager.saveBeforeShutdown().then(
+      () => {
+        clearTimeout(deadline);
+        console.info('Room saves drained; shutting down');
+        process.exit(0);
+      },
+      () => {
+        clearTimeout(deadline);
+        console.error('Room save failed during shutdown');
+        process.exit(1);
+      },
+    );
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
+
   server.listen(backendPort, process.env.HOST || '0.0.0.0', () => {
     console.log(`server running at http://localhost:${backendPort}`);
   });

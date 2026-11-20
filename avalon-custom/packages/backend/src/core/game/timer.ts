@@ -228,6 +228,11 @@ export class GameTimer {
     this.pendingHistoryDelay = 0;
   }
 
+  suspend(): void {
+    for (const timeout of this.timers.values()) clearTimeout(timeout);
+    this.timers.clear();
+  }
+
   /**
    * Get remaining time in milliseconds
    */

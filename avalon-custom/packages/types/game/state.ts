@@ -47,6 +47,8 @@ export class GameResults {
   },
 })
 export class VisualGameState {
+  /** Sequence within the current live game process, omitted from saved replays. */
+  public revision?: number;
   @prop({ _id: false })
   public result?: GameResults;
 

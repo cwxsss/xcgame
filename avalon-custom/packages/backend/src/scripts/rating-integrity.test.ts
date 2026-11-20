@@ -214,7 +214,8 @@ test('a new result worker resumes the durable archive outbox after completion fa
   const failed = new GameResultWorker(db, async () => {
     throw Error('achievement unavailable');
   });
-  await expect(failed.submit(state)).rejects.toThrow('achievement unavailable');
+  await failed.submit(state);
+  await expect(failed.flush()).rejects.toThrow('achievement unavailable');
   expect((await roomModel.findOne({ roomID: state.roomID }))?.completionPending).toBe(true);
   const recovered = new GameResultWorker(db, async () => {});
   await recovered.flush();

@@ -15,7 +15,6 @@ import type { TrueSkillSocketEvents } from './trueskill-sockets';
 
 import type {
   ISocketError,
-  IRoomUnavailableError,
   ILoginError,
   IRegisterError,
   IUpdateEmailError,
@@ -60,7 +59,7 @@ export interface ServerToClientEvents {
   roomUpdated: (state: TRoomState, chatOnly?: boolean) => void;
   gameUpdated: (state: VisualGameState) => void;
   newMessage: (message: TMessage) => void;
-  restartGame: (uuid: string) => void;
+  restartGame: (uuid: string, previousRoomID?: string) => void;
   destroyRoom: (uuid: string) => void;
   serverError: (error: string) => void;
   renewJWT: () => void;
@@ -224,9 +223,10 @@ export interface ClientToServerEvents extends ClientToServerUserEvents, TrueSkil
   finishAiDiscussion: (roomID: string, callback: (result: { ok: true } | { error: string }) => void) => void;
   joinAiRoom: (roomID: string, callback: (result: { ok: true } | { error: string }) => void) => void;
   createRoom: (callback: (result: string | ISocketError) => void) => void;
+  createRoomOnce: (requestID: string, callback: (result: string | ISocketError) => void) => void;
   updateOptions: (uuid: string, options: GameOptions) => void;
   setRoomBots: (uuid: string, bots: Array<Pick<RoomBot, 'role'>>, callback: (result: true | { error: string }) => void) => void;
-  joinRoom: (uuid: string, callback: (state: TRoomState | IRoomUnavailableError) => void) => void;
+  joinRoom: (uuid: string, callback: (state: TRoomState | ISocketError) => void) => void;
   sendMessage: (uuid: string, message: string, requestID: string, callback: (result: ChatSendResult) => void) => void;
   lockRoom: (uuid: string) => void;
   kickPlayer: (uuid: string, userID: string) => void;
@@ -238,9 +238,11 @@ export interface ClientToServerEvents extends ClientToServerUserEvents, TrueSkil
   shuffle: (uuid: string) => void;
   voteInRoom: (uuid: string, result: boolean) => void;
 
-  joinGame: (uuid: string) => void;
+  joinGame: (uuid: string, callback?: (result: true | ISocketError) => void) => void;
+  /** Claim a physical waiting-room seat (zero based). The first successful claim wins. */
+  seatGame: (uuid: string, seatIndex: number, callback: (result: true | { error: string }) => void) => void;
   startGame: (uuid: string, customRules?: GameOptionsCustomRules) => void;
-  leaveGame: (uuid: string) => void;
+  leaveGame: (uuid: string, callback?: (result: true | ISocketError) => void) => void;
   restartGame: (uuid: string) => void;
 
   selectPlayer: (uuid: string, userID: string) => void;

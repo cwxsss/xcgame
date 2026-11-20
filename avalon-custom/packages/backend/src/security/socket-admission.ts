@@ -60,7 +60,7 @@ export function installSocketAdmission(io: Server) {
         ].includes(event)
       )
         allowed = allowed && limits.take(`expensive:${ip}`, 60, 60000);
-      if (['createRoom', 'restartGame'].includes(event))
+      if (['createRoom', 'createRoomOnce', 'restartGame'].includes(event))
         allowed = allowed && limits.take(`create:${user || ip}`, 10, 60000);
       if (!allowed) {
         const ack = packet[packet.length - 1];

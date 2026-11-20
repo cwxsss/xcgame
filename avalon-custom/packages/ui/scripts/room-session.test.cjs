@@ -1,4 +1,5 @@
 const { test } = require('node:test');
+const { setImmediate: tick } = require('node:timers/promises');
 const assert = require('node:assert/strict');
 require('ts-node').register({ transpileOnly: true, compilerOptions: { module: 'CommonJS' } });
 const { createRoomSession } = require('../src/helpers/room-session.ts');
@@ -10,8 +11,10 @@ function setup() {
   const sources = [];
   const errors = [];
   const chats = [];
+  const games = [];
   let redirects = 0;
   let id = 'room';
+  let acknowledgementTimeout;
   const socket = {
     on: (name, handler) => {
       handlers[name] = handler;
@@ -19,9 +22,13 @@ function setup() {
     off: (name) => {
       delete handlers[name];
     },
+    timeout: (ms) => {
+      acknowledgementTimeout = ms;
+      return socket;
+    },
     emitWithAck: (event, roomID) =>
-      new Promise((resolve) => {
-        pending.push({ event, roomID, resolve });
+      new Promise((resolve, reject) => {
+        pending.push({ event, roomID, resolve, reject, acknowledgementTimeout });
       }),
   };
   const session = createRoomSession(
@@ -34,6 +41,7 @@ function setup() {
     (error) => errors.push(error),
     () => redirects++,
     (chat) => chats.push(chat),
+    (game) => games.push(game),
   );
   return {
     handlers,
@@ -42,6 +50,7 @@ function setup() {
     sources,
     errors,
     chats,
+    games,
     session,
     setID: (value) => {
       id = value;
@@ -49,6 +58,54 @@ function setup() {
     redirects: () => redirects,
   };
 }
+
+test('room joins use a finite acknowledgement timeout and retry without discarding a newer board update', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = setup();
+  const load = f.session.load('room');
+  assert.ok(f.pending[0].acknowledgementTimeout > 0);
+  f.handlers.gameUpdated({ uuid: 'room', revision: 7 });
+  f.pending[0].reject(new Error('ack timed out'));
+  await tick();
+  t.mock.timers.tick(2000);
+  await tick();
+  f.pending[1].resolve({ roomID: 'room', stage: 'started', game: { revision: 6 }, chat: [] });
+  await load;
+  assert.equal(f.states[0].game.revision, 7);
+  assert.deepEqual(f.errors, []);
+});
+
+test('room join retries stop at three attempts and permit a manual retry', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = setup();
+  const load = f.session.load('room');
+  for (let i = 0; i < 3; i++) {
+    f.pending[i].reject(new Error('ack timed out'));
+    await tick();
+    t.mock.timers.tick(2000);
+    await tick();
+  }
+  await load;
+  assert.equal(f.pending.length, 3);
+  assert.deepEqual(f.errors, [{ error: 'requestFailed' }]);
+  const manual = f.session.load('room');
+  f.pending[3].resolve({ roomID: 'room', chat: [] });
+  await manual;
+  assert.equal(f.states.length, 1);
+});
+
+test('leaving the page cancels scheduled room join retries', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = setup();
+  const load = f.session.load('room');
+  f.pending[0].reject(new Error('ack timed out'));
+  await tick();
+  f.session.dispose();
+  t.mock.timers.tick(2000);
+  await load;
+  assert.equal(f.pending.length, 1);
+  assert.deepEqual(f.errors, []);
+});
 
 test('room expiry reloads the archive and keeps the chat page open', async () => {
   const f = setup();
@@ -95,6 +152,20 @@ test('a buffered lobby update cannot replace a newer started-game acknowledgemen
   await loading;
   assert.equal(f.states[0].stage, 'started');
   assert.equal(f.states[0].game.stage, 'selectTeam');
+});
+
+test('reconnect keeps the highest board revision received before or after the acknowledgement', async () => {
+  const f = setup();
+  const loading = f.session.load('room');
+  f.handlers.gameUpdated({ uuid: 'room', revision: 7, stage: 'votingForTeam' });
+  f.handlers.gameUpdated({ uuid: 'room', revision: 6, stage: 'selectTeam' });
+  f.handlers.gameUpdated({ uuid: 'other', revision: 50 });
+  f.pending[0].resolve({ roomID: 'room', stage: 'started', game: { revision: 6, stage: 'selectTeam' }, chat: [] });
+  await loading;
+  assert.equal(f.states[0].game.revision, 7);
+  f.handlers.gameUpdated({ uuid: 'room', revision: 6 });
+  f.handlers.gameUpdated({ uuid: 'room', revision: 8, stage: 'onMission' });
+  assert.deepEqual(f.games.map((game) => game.revision), [8]);
 });
 
 test('chat-only broadcasts update messages without rebuilding the game replay', () => {

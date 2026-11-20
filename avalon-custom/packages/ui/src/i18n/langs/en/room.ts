@@ -4,9 +4,13 @@
  */
 export default {
   room: {
-    errorNotFound: 'This is wrong uuid',
+    errorNotFound: 'This room could not be found.',
+    connectionFailed: 'Could not reconnect to the room.',
+    reconnect: 'Reconnect',
+    reconnecting: 'Reconnecting to the room…',
     backToLobby: 'Back to lobby',
     restartGame: 'Restart game',
+    goToNextGame: 'Go to the next game',
   },
   mainPage: {
     newPlayerTitle: 'What is The Resistance: Avalon?',
@@ -36,6 +40,8 @@ export default {
 
     retryAi: 'Retry',
     showMore: 'Show more games',
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
     heroCaption: 'Trust. Deception. Avalon.',
     filterLabel: 'Filter games',
     filterall: 'All',

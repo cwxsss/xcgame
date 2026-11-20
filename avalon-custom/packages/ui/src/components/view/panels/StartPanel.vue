@@ -54,14 +54,26 @@
       </template>
       {{ $t('startPanel.copyLink') }}
     </v-btn>
-    <v-btn v-if="isUserInGame" color="warning" @click="onJoinClick"> {{ $t('startPanel.leaveGame') }} </v-btn>
+    <p v-if="roomState.stage === 'created'" class="seat-help" role="status">
+      {{ $t('startPanel.seatHelp') }}
+    </p>
+    <v-btn
+      v-if="isUserInGame"
+      color="warning"
+      :loading="seatAction === 'leave'"
+      :disabled="seatDisabled"
+      @click="onJoinClick"
+    >
+      {{ $t(seatAction === 'leave' ? 'startPanel.leavingSeat' : 'startPanel.leaveGame') }}
+    </v-btn>
     <v-btn
       v-else-if="roomState.players.length < 10"
       color="info"
-      :disabled="roomState.stage !== 'created'"
+      :disabled="roomState.stage !== 'created' || seatDisabled"
+      :loading="seatAction === 'join'"
       @click="onJoinClick"
     >
-      {{ $t('startPanel.joinGame') }}
+      {{ $t(seatAction === 'join' ? 'startPanel.joiningSeat' : 'startPanel.joinGame') }}
     </v-btn>
     <div v-if="isUserLeader" class="lobby-host-actions">
       <v-btn color="info" class="lobby-lock" @click="onLockClick">
@@ -95,14 +107,17 @@ import BotGameChoices from '@/components/view/board/modules/BotGameChoices.vue';
 
 export default defineComponent({
   name: 'StartPanel',
+  emits: { 'change-seat': (action: 'join' | 'leave') => action === 'join' || action === 'leave' },
   components: { HostPanel, BotGameChoices },
   props: {
     roomState: {
       type: Object as PropType<TPageRoomState>,
       required: true,
     },
+    seatAction: [Number, String] as PropType<number | 'join' | 'leave'>,
+    seatDisabled: Boolean,
   },
-  setup(props) {
+  setup(props, { emit }) {
     const { t, locale } = useI18n();
     const lobbyPath = computed(() => localizedPath('/', locale.value));
     const { roomState } = toRefs(props);
@@ -148,7 +163,12 @@ export default defineComponent({
         return;
       }
 
-      socket.emit(isUserInGame.value ? 'leaveGame' : 'joinGame', roomState.value.roomID);
+      const action = isUserInGame.value ? 'leave' : 'join';
+      if (roomState.value.ai) {
+        socket.emit(action === 'leave' ? 'leaveGame' : 'joinGame', roomState.value.roomID);
+        return;
+      }
+      emit('change-seat', action);
     };
 
     const startHint = computed(() =>
@@ -216,5 +236,13 @@ export default defineComponent({
   line-height: 1.4;
   text-align: center;
   margin: 0;
+}
+.seat-help {
+  max-width: 240px;
+  margin: -4px 0 12px;
+  color: rgb(var(--v-theme-text-secondary));
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
 }
 </style>

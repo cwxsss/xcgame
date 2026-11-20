@@ -123,6 +123,8 @@ current tree does not remove it from earlier Git commits.
 
 普通阿瓦隆房间使用 MongoDB 私有快照恢复等待中的配置和进行中的对局。进行中对局从最近一次保存成功的操作恢复。首次部署带快照的版本前，等现有对局打完再重启后端，旧版创建的活动房间缺少恢复数据。
 
+计划重启通过服务管理器发送 `SIGTERM`。后端停止接收新的游戏操作，等待已接收的操作和房间写入完成后退出。服务管理器的停止超时需大于应用的 25 秒保存期限。
+
 对外只提供合并入口。两个上游保留在回环地址。原游戏厅的入口 Cookie 同时用于保护新版阿瓦隆页面和联机连接。
 
 阿瓦隆语音使用现有 LiveKit 服务。按 `deploy/voice/livekit.yaml.example` 配置媒体服务，在阿瓦隆后端设置 `VOICE_ENABLED=true`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`LIVEKIT_INTERNAL_URL`、`LIVEKIT_PUBLIC_URL` 和 `VOICE_GATEWAY_PORT`。同源部署时，将 `LIVEKIT_PUBLIC_URL` 设为大厅的 WebSocket 源地址，合并入口的 `AVALON_VOICE_UPSTREAM` 指向语音网关的内部 HTTP 地址。生产环境使用 `wss://`，并按 LiveKit 的配置开放媒体端口。

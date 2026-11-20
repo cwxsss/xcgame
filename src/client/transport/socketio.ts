@@ -31,6 +31,12 @@ type SocketOpts = Partial<
 interface SocketIOOpts {
   server?: string;
   socketOpts?: SocketOpts;
+  onSeatLost?: (
+    matchID: string,
+    playerID: PlayerID,
+    credentials: string,
+    replaced: boolean,
+  ) => void;
 }
 
 type SocketIOTransportOpts = TransportOpts &
@@ -47,6 +53,7 @@ export class SocketIOTransport extends Transport {
   server: string;
   socket: ioNamespace.Socket;
   socketOpts: SocketOpts;
+  private readonly onSeatLost?: SocketIOOpts['onSeatLost'];
 
   /**
    * Creates a new Multiplayer instance.
@@ -60,12 +67,19 @@ export class SocketIOTransport extends Transport {
    * @param {string} numPlayers - The number of players.
    * @param {string} server - The game server in the form of 'hostname:port'. Defaults to the server serving the client if not provided.
    */
-  constructor({ socket, socketOpts, server, ...opts }: SocketIOTransportOpts) {
+  constructor({
+    socket,
+    socketOpts,
+    server,
+    onSeatLost,
+    ...opts
+  }: SocketIOTransportOpts) {
     super(opts);
 
     this.server = server;
     this.socket = socket;
     this.socketOpts = socketOpts;
+    this.onSeatLost = onSeatLost;
   }
 
   sendAction(state: State, action: CredentialedActionShape.Any): void {
@@ -155,6 +169,27 @@ export class SocketIOTransport extends Transport {
       this.notifyClient({ type: 'chat', args: [matchID, chatMessage] });
     });
 
+    if (this.onSeatLost) {
+      const report =
+        (replaced: boolean) =>
+        (seat: { matchID: string; playerID: PlayerID }) => {
+          if (
+            seat.matchID === this.matchID &&
+            seat.playerID === this.playerID &&
+            this.credentials
+          ) {
+            this.onSeatLost(
+              seat.matchID,
+              seat.playerID,
+              this.credentials,
+              replaced,
+            );
+          }
+        };
+      this.socket.on('seat-replaced', report(true));
+      this.socket.on('seat-unavailable', report(false));
+    }
+
     // Keep track of connection status.
     this.socket.on('connect', () => {
       // Initial sync to get game state.
@@ -200,11 +235,16 @@ export class SocketIOTransport extends Transport {
   }
 }
 
-export function SocketIO({ server, socketOpts }: SocketIOOpts = {}) {
+export function SocketIO({
+  server,
+  socketOpts,
+  onSeatLost,
+}: SocketIOOpts = {}) {
   return (transportOpts: SocketIOTransportOpts) =>
     new SocketIOTransport({
       server,
       socketOpts,
+      onSeatLost,
       ...transportOpts,
     });
 }

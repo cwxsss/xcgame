@@ -303,6 +303,46 @@ a {
   font-size: 0.8rem;
   color: #34564a;
 }
+.tt-seat-recovery {
+  margin-bottom: 1rem;
+  gap: 0.7rem;
+}
+.tt-seat-recovery summary {
+  cursor: pointer;
+  color: #1c5446;
+  font-weight: 750;
+}
+.tt-seat-recovery p {
+  color: #596b7f;
+  font-size: 0.9rem;
+}
+.tt-seat-recovery-code {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid #b4d8c9;
+  border-radius: 0.65rem;
+  background: #effaf4;
+  padding: 0.75rem;
+  color: #245b45;
+}
+.tt-seat-recovery-code strong {
+  color: #153d30;
+  font: 800 1.5rem/1.1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.16em;
+}
+.tt-seat-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tt-seat-recovery-actions .tt-button {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.86rem;
+}
+.tt-join-recovery {
+  max-width: 30rem;
+}
 .splendor-desktop .gem {
   clip-path: polygon(
     22% 0,
@@ -475,6 +515,28 @@ a {
     border-radius: 0.6rem;
     background: #fffdf9;
     box-shadow: 0 0.3rem 1rem #18283322;
+  }
+
+  .tt-seat-recovery,
+  .tt-join-recovery {
+    width: 100%;
+    max-width: none;
+  }
+
+  .tt-seat-recovery-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tt-seat-recovery-actions .tt-button,
+  .tt-join-recovery > .tt-button {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .tt-seat-recovery-code strong {
+    overflow-wrap: anywhere;
+    font-size: 1.25rem;
   }
 
   .tt-main .splendor-mobile-lobby .splendor-mobile-lobby-heading {

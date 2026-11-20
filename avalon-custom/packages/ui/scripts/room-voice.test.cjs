@@ -144,6 +144,33 @@ test('revocation while a microphone request is pending leaves capture off', asyn
   ]);
 });
 
+test('a push-to-talk release queues microphone disable while enable is pending', async () => {
+  const f = fixture();
+  await f.voice.refresh();
+  const joining = f.voice.join();
+  await tick();
+  f.connect();
+  await joining;
+  let resolveEnable;
+  f.client.setMicrophoneEnabled = async (enabled) => {
+    f.calls.push(['mic', enabled]);
+    if (enabled) await new Promise((resolve) => (resolveEnable = resolve));
+  };
+
+  const enabling = f.voice.setMicrophoneEnabled(true);
+  await f.voice.setMicrophoneEnabled(false);
+  assert.deepEqual(f.calls.filter((call) => call[0] === 'mic'), [['mic', false], ['mic', true]]);
+  resolveEnable();
+  await enabling;
+  await tick();
+  assert.deepEqual(f.calls.filter((call) => call[0] === 'mic'), [
+    ['mic', false],
+    ['mic', true],
+    ['mic', false],
+  ]);
+  assert.equal(f.voice.microphoneEnabled.value, false);
+});
+
 test('LiveKit adapter routes per-person gain through Web Audio and detaches on exit', async () => {
   let instance;
   const element = {
@@ -362,11 +389,13 @@ test('SDK forwards microphone and speaker changes for local and remote participa
     'LocalTrackPublished',
     'LocalTrackUnpublished',
     'ActiveSpeakersChanged',
+    'SignalReconnecting',
     'Reconnecting',
     'Reconnected',
   ];
   const changes = [];
   const local = [];
+  const reconnects = [];
   const client = createLiveKitVoiceClient({
     Room: FakeRoom,
     RoomEvent: Object.fromEntries(names.map((n) => [n, n])),
@@ -379,7 +408,7 @@ test('SDK forwards microphone and speaker changes for local and remote participa
     onPlaybackBlocked() {},
     onParticipantAudio: (id, s) => changes.push([id, s]),
     onLocalAudio: (s) => local.push(s),
-    onReconnecting() {},
+    onReconnecting: (active) => reconnects.push(active),
   });
   remote.isMicrophoneEnabled = true;
   remote.isSpeaking = true;
@@ -391,6 +420,11 @@ test('SDK forwards microphone and speaker changes for local and remote participa
   remote.isMicrophoneEnabled = false;
   instance.events.TrackMuted({}, remote);
   assert.deepEqual(changes.at(-1), ['s2', { microphoneEnabled: false, speaking: false }]);
+  instance.events.SignalReconnecting();
+  instance.events.Reconnected();
+  instance.events.Reconnecting();
+  instance.events.Reconnected();
+  assert.deepEqual(reconnects, [true, false, true, false]);
   client.disconnect();
   const count = changes.length;
   instance.events.ActiveSpeakersChanged([]);

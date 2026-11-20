@@ -27,6 +27,8 @@
     "test:coverage": "pnpm run lint && cross-env NODE_ENV=test jest --coverage --collectCoverageFrom=\"src/**\"",
     "test:coveralls": "coveralls < coverage/lcov.info",
     "test:integration": "node ./scripts/integration.js",
+    "test:tabletop:splendor": "node scripts/test-splendor-regressions.cjs",
+    "test:tabletop:splendor:mobile": "node scripts/test-splendor-mobile-browser.cjs",
     "ts": "tsc --noEmit",
     "ts:watch": "tsc --noEmit --watch",
     "lint": "eslint .",

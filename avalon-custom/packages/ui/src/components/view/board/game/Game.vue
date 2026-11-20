@@ -81,6 +81,22 @@
       class="button-panel actions-or-info mb-4 d-flex flex-column align-center"
       :class="{ 'trapper-action': gameState.stage === 'discardMissionCard' }"
     >
+        <div
+          v-if="actionStatus"
+          class="action-status"
+          data-testid="action-status"
+          :class="{ 'action-status-mine': actionStatus.isMine }"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="material-icons action-status-icon" aria-hidden="true">
+            {{ actionStatus.isMine ? 'touch_app' : 'hourglass_top' }}
+          </span>
+          <span class="action-status-text">{{ actionStatus.text }}</span>
+          <span v-if="actionStatus.waiting > 1" class="action-status-count">
+            {{ t('game.actionWaitingCount', { count: actionStatus.waiting }) }}
+          </span>
+        </div>
       <PlotCardsPanel v-if="!visibleHistory" :data="gameState.addonsData.plotCards?.activeCards" :game="gameState" />
       <InGamePanel
         v-if="inGamePanel && !visibleHistory && stateManager.viewMode.value === 'live'"
@@ -245,6 +261,27 @@ export default defineComponent({
       return gameStageLabel(gameState.value.stage);
     });
 
+    const actionStatus = computed(() => {
+      if (
+        stateManager.viewMode.value !== 'live' ||
+        gameState.value.stage === 'end' ||
+        props.visibleHistory
+      ) {
+        return undefined;
+      }
+
+      const ownPlayer = gameState.value.players.find((player) => player.id === store.state.profile?.id);
+      const isMine = ownPlayer?.features.waitForAction === true;
+      const waiting = gameState.value.players.filter((player) => player.features.waitForAction === true).length;
+      const key = isMine ? `game.actionMine.${gameState.value.stage}` : `game.actionOther.${gameState.value.stage}`;
+      const translated = t(key);
+      const text = translated === key
+        ? t(isMine ? 'game.actionMine.default' : 'game.actionOther.default')
+        : translated;
+
+      return { isMine, text, waiting };
+    });
+
     return {
       gameState,
       playerNames,
@@ -255,6 +292,7 @@ export default defineComponent({
       roomState,
       historyTextArray,
       computedStyles,
+      actionStatus,
     };
   },
 });
@@ -274,13 +312,64 @@ export default defineComponent({
 }
 
 .actions-or-info {
-  height: 84px;
+  min-height: 84px;
+  height: auto;
 }
 .actions-or-info.trapper-action {
   height: auto;
   min-height: 84px;
   gap: 8px;
   text-align: center;
+}
+
+.action-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: min(100%, calc(100vw - 32px));
+  min-height: 26px;
+  margin: -3px 0 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
+  border-radius: 999px;
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  background: rgba(var(--v-theme-surface), 0.76);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.action-status-mine {
+  border-color: rgba(var(--v-theme-primary), 0.65);
+  color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.12);
+  font-weight: 700;
+}
+
+.action-status-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
+.action-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-status-count {
+  flex: 0 0 auto;
+  opacity: 0.78;
+}
+
+@media (max-width: 600px) {
+  .action-status {
+    width: min(100%, calc(100vw - 24px));
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
 }
 
 .action-icon {

@@ -7,6 +7,7 @@ export default {
     rateLimited: 'Too many requests. Please wait and try again.',
     invalidRequest: 'Please check the information you entered.',
     requestFailed: 'The request failed. Please try again.',
+    serverRestarting: 'The game server is restarting. Please try again shortly.',
     roomLimit: 'The room limit has been reached. Please try again later.',
     forbidden: 'You do not have permission to perform this action.',
 
